@@ -108,28 +108,39 @@ function parseEmbeddedJson(html) {
   return null;
 }
 
-function imageUrlsFromItem(item) {
+/** Full-res download URL first; smaller candidate for carousel preview when available. */
+function imageEntriesFromItem(item) {
   const images = item?.imagePost?.images;
   if (!Array.isArray(images)) return [];
   return images
-    .map((img) => img?.imageURL?.urlList?.[0] || img?.imageURL?.urlList?.[1] || "")
-    .filter((src) => src.startsWith("http"));
+    .map((img) => {
+      const list = (img?.imageURL?.urlList || []).filter(
+        (src) => typeof src === "string" && src.startsWith("http")
+      );
+      if (!list.length) return null;
+      return {
+        full: list[0],
+        preview: list[1] || list[list.length - 1] || list[0],
+      };
+    })
+    .filter(Boolean);
 }
 
 function previewFromItem(url, item) {
   const video = item.video || {};
   const author = item.author || {};
   const stats = item.stats || {};
-  const images = imageUrlsFromItem(item);
+  const images = imageEntriesFromItem(item);
   const playAddr = video.playAddr || video.PlayAddrStruct?.UrlList?.[0] || "";
   const downloadAddr = video.downloadAddr || "";
-  const cover = video.originCover || video.cover || video.dynamicCover || images[0] || "";
+  const cover =
+    video.originCover || video.cover || video.dynamicCover || images[0]?.preview || images[0]?.full || "";
 
   const urls = {};
   if (playAddr) urls["tt:play"] = playAddr;
   if (downloadAddr && downloadAddr !== playAddr) urls["tt:download"] = downloadAddr;
-  images.forEach((src, index) => {
-    urls[`tt:img:${index}`] = src;
+  images.forEach((entry, index) => {
+    urls[`tt:img:${index}`] = entry.full;
   });
 
   const formats = [];
@@ -173,9 +184,9 @@ function previewFromItem(url, item) {
         views: stats.playCount ?? null,
       },
       slides: images.length
-        ? images.map((thumbnail, index) => ({
+        ? images.map((entry, index) => ({
             id: String(index),
-            thumbnail,
+            thumbnail: entry.preview,
             title: item.desc || `Photo ${index + 1}`,
             downloadId: `tt:img:${index}`,
             mediaKind: "image",

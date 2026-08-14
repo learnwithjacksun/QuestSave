@@ -132,10 +132,18 @@ function parseDumpJson(stdout) {
   return entries;
 }
 
-function pickThumbnail(entry) {
+/** Prefer a mid/small thumb for carousel preview; fall back to largest / entry.thumbnail. */
+function pickThumbnail(entry, { preferSmall = false } = {}) {
+  const thumbs = Array.isArray(entry.thumbnails)
+    ? entry.thumbnails.filter((t) => t?.url)
+    : [];
+  if (preferSmall && thumbs.length) {
+    const sorted = [...thumbs].sort((a, b) => (a.width || 0) - (b.width || 0));
+    const mid = sorted.find((t) => (t.width || 0) >= 240) || sorted[Math.min(1, sorted.length - 1)] || sorted[0];
+    return mid?.url || entry.thumbnail || "";
+  }
   if (entry.thumbnail) return entry.thumbnail;
-  const thumbs = entry.thumbnails;
-  if (Array.isArray(thumbs) && thumbs.length) {
+  if (thumbs.length) {
     return thumbs[thumbs.length - 1]?.url || thumbs[0]?.url || "";
   }
   return "";
@@ -304,7 +312,7 @@ export async function resolveMedia(url, platform) {
     const entryType = detectMediaType([entry]);
     return {
       id: String(entry.id || index),
-      thumbnail: pickThumbnail(entry),
+      thumbnail: pickThumbnail(entry, { preferSmall: true }),
       title: entry.title || "",
       mediaKind: entryType === "mixed" ? "video" : entryType,
       downloadId: multi ? `item:${index}` : entryType === "image" ? "best" : undefined,

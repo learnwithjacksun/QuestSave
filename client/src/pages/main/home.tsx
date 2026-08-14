@@ -7,12 +7,20 @@ import SaveClipModal from "@/components/main/save-clip-modal";
 import { downloadClipFile, resolveClip, saveClip } from "@/config/clipApi";
 import { getApiError } from "@/config/api";
 import useAuthStore from "@/store/useAuthStore";
-import type { ClipPreview } from "@/types/clip";
+import type { ClipFormat, ClipPreview } from "@/types/clip";
+
+function defaultFormatId(formats: ClipFormat[], mediaType: ClipPreview["mediaType"]) {
+  if (mediaType === "image" || mediaType === "mixed") {
+    const imageFormat = formats.find((fmt) => fmt.mediaKind === "image");
+    if (imageFormat) return imageFormat.id;
+  }
+  return formats[0]?.id || "";
+}
 
 export default function Home() {
   const { user, pendingSave, setPendingSave, openOverlay } = useAuthStore();
   const [loading, setLoading] = useState(false);
-  const [downloading, setDownloading] = useState(false);
+  const [modalAction, setModalAction] = useState<"save" | "download" | null>(null);
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<ClipPreview | null>(null);
   const [formatId, setFormatId] = useState("");
@@ -20,7 +28,11 @@ export default function Home() {
   const [saveOpen, setSaveOpen] = useState(false);
   const savingRef = useRef(false);
 
-  const activeFormatId = slideInfo?.downloadId || formatId;
+  const selectedFormat = preview?.formats.find((fmt) => fmt.id === formatId);
+  const activeFormatId =
+    selectedFormat?.mediaKind === "image" && slideInfo?.downloadId
+      ? slideInfo.downloadId
+      : formatId;
 
   const handleResolve = async (url: string) => {
     setLoading(true);
@@ -30,7 +42,7 @@ export default function Home() {
     try {
       const data = await resolveClip(url);
       setPreview(data);
-      setFormatId(data.formats[0]?.id || "");
+      setFormatId(defaultFormatId(data.formats, data.mediaType));
     } catch (err) {
       const message = getApiError(err, "Could not fetch this link");
       setError(message);
@@ -42,21 +54,21 @@ export default function Home() {
 
   const runDownload = async () => {
     if (!preview || !activeFormatId) return;
-    setDownloading(true);
+    setModalAction("download");
     try {
       await downloadClipFile(preview.sourceUrl, activeFormatId, preview.title);
       toast.success("Download started");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : getApiError(err, "Download failed"));
     } finally {
-      setDownloading(false);
+      setModalAction(null);
       setSaveOpen(false);
     }
   };
 
   const runSaveAndDownload = async () => {
     if (!preview || !activeFormatId) return;
-    setDownloading(true);
+    setModalAction("save");
     try {
       const thumbnail = slideInfo?.thumbnail || preview.thumbnail;
       await Promise.all([
@@ -75,7 +87,7 @@ export default function Home() {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : getApiError(err, "Could not save clip"));
     } finally {
-      setDownloading(false);
+      setModalAction(null);
       setSaveOpen(false);
       setPendingSave(false);
     }
@@ -131,7 +143,6 @@ export default function Home() {
             onFormatChange={setFormatId}
             onSlideChange={setSlideInfo}
             onDownload={() => setSaveOpen(true)}
-            downloading={downloading}
           />
         )}
 
@@ -148,7 +159,8 @@ export default function Home() {
         onClose={() => setSaveOpen(false)}
         onSaveAndDownload={handleSaveAndDownload}
         onDownloadOnly={() => void runDownload()}
-        busy={downloading}
+        saving={modalAction === "save"}
+        downloading={modalAction === "download"}
       />
     </div>
   );

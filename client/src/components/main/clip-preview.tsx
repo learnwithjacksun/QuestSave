@@ -10,7 +10,7 @@ import {
 import { SelectWithoutIcon } from "@/components/ui";
 import { formatCount } from "@/helpers/formatCount";
 import { proxiedImageUrl } from "@/helpers/proxiedImageUrl";
-import type { ClipPreview, ClipSlide } from "@/types/clip";
+import type { ClipFormat, ClipPreview, ClipSlide } from "@/types/clip";
 import Icon from "./icon";
 
 const platformLabels: Record<ClipPreview["platform"], string> = {
@@ -35,7 +35,14 @@ interface ClipPreviewCardProps {
   onFormatChange: (id: string) => void;
   onSlideChange?: (info: SelectedSlideInfo) => void;
   onDownload: () => void;
-  downloading?: boolean;
+}
+
+function formatOptionLabel(fmt: ClipFormat) {
+  const ext = (fmt.ext || fmt.qualityLabel || "file").toUpperCase();
+  if (fmt.mediaKind === "video") return `Video (${ext})`;
+  if (fmt.mediaKind === "audio") return `Audio (${ext})`;
+  if (fmt.mediaKind === "image") return `Image (${ext})`;
+  return fmt.qualityLabel || ext;
 }
 
 export default function ClipPreviewCard({
@@ -44,9 +51,11 @@ export default function ClipPreviewCard({
   onFormatChange,
   onSlideChange,
   onDownload,
-  downloading = false,
 }: ClipPreviewCardProps) {
   const [slide, setSlide] = useState(0);
+  const [imageStatus, setImageStatus] = useState<"loading" | "loaded" | "error">(
+    "loading"
+  );
   const slides = preview.slides.length
     ? preview.slides
     : [{ id: "0", thumbnail: preview.thumbnail, title: preview.title }];
@@ -58,22 +67,38 @@ export default function ClipPreviewCard({
     Boolean(current?.downloadId?.includes(":img:"));
 
   const selectedFormat = preview.formats.find((f) => f.id === selectedFormatId);
+  const selectedKind = selectedFormat?.mediaKind;
+  const imageMode = selectedKind === "image" || (!selectedFormat && isPhotoSet);
   const activeDownloadId =
-    (isPhotoSet && current?.downloadId) || selectedFormatId;
+    (imageMode && current?.downloadId) || selectedFormatId;
+  const imageSrc = current?.thumbnail ? proxiedImageUrl(current.thumbnail) : "";
 
   useEffect(() => {
     if (!current) return;
     onSlideChange?.({
       index: slide,
       slide: current,
-      downloadId:
-        (preview.mediaType === "image" || current.downloadId?.includes(":img:") || current.downloadId?.startsWith("item:")
-          ? current.downloadId
-          : undefined) || selectedFormatId,
+      downloadId: current.downloadId || selectedFormatId,
       thumbnail: current.thumbnail || preview.thumbnail,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slide, current?.downloadId, current?.thumbnail, selectedFormatId]);
+
+  useEffect(() => {
+    setImageStatus(imageSrc ? "loading" : "error");
+  }, [imageSrc]);
+
+  useEffect(() => {
+    if (!hasCarousel) return;
+    const prev = slides[(slide - 1 + slides.length) % slides.length];
+    const next = slides[(slide + 1) % slides.length];
+    for (const neighbor of [prev, next]) {
+      const src = neighbor?.thumbnail ? proxiedImageUrl(neighbor.thumbnail) : "";
+      if (!src || src === imageSrc) continue;
+      const img = new Image();
+      img.src = src;
+    }
+  }, [hasCarousel, imageSrc, slide, slides]);
 
   const stats = useMemo(
     () =>
@@ -87,15 +112,18 @@ export default function ClipPreviewCard({
 
   const formatOptions = preview.formats.map((fmt) => ({
     value: fmt.id,
-    label: fmt.qualityLabel || fmt.ext.toUpperCase(),
+    label: formatOptionLabel(fmt),
   }));
 
-  const showFormatSelect = !(isPhotoSet && preview.formats.length <= 1);
+  const showFormatSelect = preview.formats.length > 1;
 
   const downloadLabel = (() => {
-    if (downloading) return "Downloading...";
-    if (isPhotoSet && hasCarousel) return `Download Photo ${slide + 1}`;
-    if (isPhotoSet) return "Download Photo";
+    if (selectedKind === "video") return "Download MP4";
+    if (selectedKind === "audio") {
+      return `Download ${(selectedFormat?.ext || "mp3").toUpperCase()}`;
+    }
+    if (imageMode && hasCarousel) return `Download Photo ${slide + 1}`;
+    if (imageMode) return "Download Photo";
     const type = (selectedFormat?.qualityLabel || selectedFormat?.ext || "file").toUpperCase();
     return `Download ${type}`;
   })();
@@ -103,12 +131,26 @@ export default function ClipPreviewCard({
   return (
     <div className="w-full max-w-3xl mx-auto mt-8 rounded-2xl border border-line bg-surface/60 overflow-hidden text-left">
       <div className="relative bg-hover aspect-video center">
-        {current?.thumbnail ? (
-          <img
-            src={proxiedImageUrl(current.thumbnail)}
-            alt={preview.title || "Media preview"}
-            className="h-full w-full object-contain"
-          />
+        {imageSrc ? (
+          <>
+            <img
+              src={imageSrc}
+              alt={preview.title || "Media preview"}
+              className={`h-full w-full object-contain transition-opacity duration-200 ${
+                imageStatus === "loaded" ? "opacity-100" : "opacity-40"
+              }`}
+              onLoad={() => setImageStatus("loaded")}
+              onError={() => setImageStatus("error")}
+            />
+            {imageStatus === "loading" && (
+              <div className="absolute inset-0 center pointer-events-none">
+                <div className="flex flex-col items-center gap-2 rounded-xl bg-background/80 px-4 py-3 text-main">
+                  <Loader className="animate-spin" size={22} />
+                  <span className="text-xs text-muted">Loading image…</span>
+                </div>
+              </div>
+            )}
+          </>
         ) : (
           <p className="text-sm text-muted">No preview image</p>
         )}
@@ -177,10 +219,9 @@ export default function ClipPreviewCard({
         <button
           type="button"
           onClick={onDownload}
-          disabled={!activeDownloadId || downloading}
+          disabled={!activeDownloadId}
           className="btn btn-primary h-11 w-full rounded-xl gap-2"
         >
-          {downloading && <Loader className="animate-spin" size={18} />}
           {downloadLabel}
         </button>
       </div>
