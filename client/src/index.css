@@ -1,0 +1,108 @@
+@import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Libertinus+Serif+Display&display=swap');
+
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --background: #ffffff;
+  --surface: #f7f7f8;
+  --sidebar: #f9f9f9;
+  --foreground: #ececec;
+  --main: #0d0d0d;
+  --muted: #676767;
+  --primary: #FE6022;
+  --line: #ededed;
+  --input: #ffffff;
+  --input-border: #d9d9e3;
+  --hover: #f0f0f0;
+  --accent: #FE6022;
+}
+
+.dark {
+  --background: #212121;
+  --surface: #2f2f2f;
+  --sidebar: #171717;
+  --foreground: #ececec;
+  --main: #ececec;
+  --muted: #9b9b9b;
+  --primary: #FE6022;
+  --line: #ffffff14;
+  --input: #2f2f2f;
+  --input-border: #ffffff1a;
+  --hover: #ffffff0a;
+  --accent: #FE6022;
+}
+
+@theme inline {
+  --font-sans: "Inter", sans-serif;
+  --font-display: "Libertinus Serif Display", cursive;
+  --font-dancing: "Dancing Script", cursive;
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-sidebar: var(--sidebar);
+  --color-foreground: var(--foreground);
+  --color-main: var(--main);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-primary: var(--primary);
+  --color-input: var(--input);
+  --color-input-border: var(--input-border);
+  --color-hover: var(--hover);
+  --color-accent: var(--accent);
+}
+
+* {
+  @apply outline-none;
+}
+
+body {
+  @apply bg-background text-main font-sans antialiased;
+}
+
+.main {
+  @apply max-w-[90%] 2xl:max-w-[1280px] mx-auto;
+}
+
+.layout {
+  @apply max-w-[90%] md:max-w-[700px] mx-auto;
+}
+
+.center {
+  @apply flex items-center justify-center;
+}
+
+.btn {
+  @apply cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-primary {
+  @apply text-white flex items-center justify-center bg-primary font-semibold;
+}
+
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  @apply hidden;
+}
+
+.hide-scrollbar::-webkit-scrollbar-thumb {
+  @apply hidden;
+}
+
+@keyframes float-soft {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.float-soft {
+  animation: float-soft 7s ease-in-out infinite;
+}

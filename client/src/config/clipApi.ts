@@ -1,0 +1,111 @@
+import api, { getApiError } from "@/config/api";
+import type { AuthUser, ClipPreview, SavedClip } from "@/types/clip";
+
+export async function resolveClip(url: string) {
+  const { data } = await api.post<ClipPreview>("/api/clips/resolve", { url });
+  return data;
+}
+
+export async function saveClip(payload: {
+  url: string;
+  platform: string;
+  title: string;
+  author: string;
+  thumbnail: string;
+  formatId?: string;
+  mediaType: string;
+}) {
+  const { data } = await api.post("/api/clips/save", payload);
+  return data;
+}
+
+export async function deleteClip(id: string) {
+  await api.delete(`/api/clips/${id}`);
+}
+
+export async function downloadClipFile(url: string, formatId: string) {
+  try {
+    const { data, headers } = await api.post(
+      "/api/clips/download",
+      { url, formatId },
+      { responseType: "blob" }
+    );
+
+    const blob = data as Blob;
+    const disposition = headers["content-disposition"] as string | undefined;
+    const match = disposition?.match(/filename="([^"]+)"/);
+    const filename = match?.[1] || "questsave-clip";
+
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(objectUrl);
+  } catch (error) {
+    if (axiosErrorBlob(error)) {
+      const message = await readBlobError(error);
+      throw new Error(message);
+    }
+    throw new Error(getApiError(error, "Download failed"));
+  }
+}
+
+export async function requestOtp(email: string, username?: string) {
+  const { data } = await api.post<{
+    exists?: boolean;
+    needsUsername?: boolean;
+    message?: string;
+  }>("/api/auth/request-otp", { email, username });
+  return data;
+}
+
+export async function verifyOtp(email: string, code: string, username?: string) {
+  const { data } = await api.post<{ user: AuthUser }>("/api/auth/verify-otp", {
+    email,
+    code,
+    username,
+  });
+  return data.user;
+}
+
+export async function fetchMe() {
+  const { data } = await api.get<{ user: AuthUser | null }>("/api/auth/me");
+  return data.user;
+}
+
+export async function logout() {
+  await api.post("/api/auth/logout");
+}
+
+export async function fetchSavedClips() {
+  const { data } = await api.get<{ clips: SavedClip[] }>("/api/clips");
+  return data.clips;
+}
+
+function axiosErrorBlob(error: unknown): error is { response: { data: Blob } } {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "response" in error &&
+    Boolean((error as { response?: { data?: unknown } }).response?.data)
+  );
+}
+
+async function readBlobError(error: { response: { data: Blob | object } }) {
+  const data = error.response.data;
+  if (data instanceof Blob) {
+    try {
+      const json = JSON.parse(await data.text()) as { message?: string };
+      return json.message || "Download failed";
+    } catch {
+      return "Download failed";
+    }
+  }
+  if (typeof data === "object" && data && "message" in data) {
+    return String((data as { message: string }).message);
+  }
+  return "Download failed";
+}
