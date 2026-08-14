@@ -3,6 +3,7 @@ import Clip from "../models/Clip.js";
 import { detectPlatform, sanitizeFormatId } from "../services/platform.js";
 import { getResolved, setResolved } from "../services/resolveCache.js";
 import { downloadTikTok, isTikTokFormat, resolveTikTok } from "../services/tiktok.js";
+import { downloadTwitter, isTwitterFormat, resolveTwitter } from "../services/twitter.js";
 import { downloadMedia, resolveMedia } from "../services/ytdlp.js";
 import { AppError } from "../utils/AppError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -39,7 +40,12 @@ export const resolveClip = asyncHandler(async (req, res) => {
     return;
   }
 
-  const preview = platform === "tiktok" ? await resolveTikTok(url) : await resolveMedia(url, platform);
+  const preview =
+    platform === "tiktok"
+      ? await resolveTikTok(url)
+      : platform === "twitter"
+        ? await resolveTwitter(url)
+        : await resolveMedia(url, platform);
   setResolved(url, preview);
   res.json(preview);
 });
@@ -60,7 +66,9 @@ export const downloadClip = asyncHandler(async (req, res) => {
   const formatId = sanitizeFormatId(parsed.data.formatId);
   const file = isTikTokFormat(formatId)
     ? await downloadTikTok(url, formatId)
-    : await downloadMedia(url, formatId);
+    : isTwitterFormat(formatId)
+      ? await downloadTwitter(url, formatId)
+      : await downloadMedia(url, formatId);
 
   const title = parsed.data.title?.trim() || getResolved(url)?.title || "";
   const ext = (file.filename || "").includes(".")

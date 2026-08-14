@@ -20,6 +20,12 @@ const env = {
   ytdlp: {
     path: process.env.YTDLP_PATH || "yt-dlp",
     timeoutMs: Number(process.env.YTDLP_TIMEOUT_MS) || 60_000,
+    /** Netscape cookies file for YouTube / X bot checks (optional). */
+    cookies: process.env.YTDLP_COOKIES || "",
+    /** e.g. chrome, chromium, firefox — only works when the browser profile exists on the server. */
+    cookiesFromBrowser: process.env.YTDLP_COOKIES_FROM_BROWSER || "",
+    /** curl_cffi target such as chrome; leave empty to skip impersonation. */
+    impersonate: process.env.YTDLP_IMPERSONATE || "",
   },
 };
 

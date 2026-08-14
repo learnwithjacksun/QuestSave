@@ -1,5 +1,5 @@
-import { spawn } from "child_process";
-import { createReadStream } from "fs";
+import { spawn, execFileSync } from "child_process";
+import { createReadStream, existsSync } from "fs";
 import { mkdtemp, readdir, rm, stat } from "fs/promises";
 import os from "os";
 import path from "path";
@@ -10,14 +10,86 @@ const FORMAT_ID_SAFE = /^[a-zA-Z0-9._+\-*/[\]():]+$/;
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
+let cachedJsRuntimes = null;
+let cachedImpersonate = undefined;
+
+function detectJsRuntimes() {
+  if (cachedJsRuntimes) return cachedJsRuntimes;
+  const runtimes = [];
+  const deno =
+    process.env.DENO_PATH ||
+    ["deno", path.join(os.homedir(), ".deno/bin/deno")].find((candidate) => {
+      try {
+        if (candidate.includes("/") || candidate.includes("\\")) return existsSync(candidate);
+        execFileSync(candidate, ["--version"], { stdio: "ignore", timeout: 3000 });
+        return true;
+      } catch {
+        return false;
+      }
+    });
+  if (deno) {
+    runtimes.push(deno.includes("/") || deno.includes("\\") ? `deno:${deno}` : "deno");
+  }
+  try {
+    execFileSync(process.execPath, ["--version"], { stdio: "ignore", timeout: 3000 });
+    runtimes.push(`node:${process.execPath}`);
+  } catch {
+    // ignore
+  }
+  cachedJsRuntimes = runtimes;
+  return runtimes;
+}
+
+function detectImpersonateTarget() {
+  if (cachedImpersonate !== undefined) return cachedImpersonate;
+  if (env.ytdlp.impersonate) {
+    cachedImpersonate = env.ytdlp.impersonate;
+    return cachedImpersonate;
+  }
+  try {
+    const out = execFileSync(env.ytdlp.path, ["--list-impersonate-targets"], {
+      encoding: "utf8",
+      timeout: 8000,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const available = out
+      .split("\n")
+      .filter((line) => /curl_cffi/i.test(line) && !/unavailable/i.test(line));
+    const chrome = available.find((line) => /^Chrome\b/i.test(line.trim()));
+    cachedImpersonate = chrome ? "chrome" : null;
+  } catch {
+    cachedImpersonate = null;
+  }
+  return cachedImpersonate;
+}
+
 function commonArgs() {
-  return [
-    "--no-warnings",
-    "--user-agent",
-    USER_AGENT,
+  const args = ["--no-warnings"];
+  const impersonate = detectImpersonateTarget();
+  if (impersonate) {
+    args.push("--impersonate", impersonate);
+  } else {
+    args.push("--user-agent", USER_AGENT);
+  }
+
+  // web first so cookies are honored; android/tv as fallbacks. Syndication helps guest X access.
+  args.push(
     "--extractor-args",
-    "youtube:player_client=android,web",
-  ];
+    "youtube:player_client=web,mweb,tv,android;twitter:api=syndication"
+  );
+
+  const runtimes = detectJsRuntimes();
+  if (runtimes.length) {
+    args.push("--js-runtimes", runtimes.join(","));
+  }
+
+  if (env.ytdlp.cookies && existsSync(env.ytdlp.cookies)) {
+    args.push("--cookies", env.ytdlp.cookies);
+  } else if (env.ytdlp.cookiesFromBrowser) {
+    args.push("--cookies-from-browser", env.ytdlp.cookiesFromBrowser);
+  }
+
+  return args;
 }
 
 function mapExtractorError(stdout, stderr) {
@@ -27,10 +99,21 @@ function mapExtractorError(stdout, stderr) {
     console.error("[yt-dlp]", stderr.trim() || stdout.trim());
   }
 
+  if (
+    combined.includes("sign in to confirm") ||
+    combined.includes("confirm you're not a bot") ||
+    combined.includes("confirm you’re not a bot") ||
+    combined.includes("use --cookies")
+  ) {
+    return new AppError(
+      "YouTube is blocking this server (bot check). Export cookies to YTDLP_COOKIES or set YTDLP_COOKIES_FROM_BROWSER, install deno/curl_cffi, then retry.",
+      403
+    );
+  }
   if (combined.includes("http error 403") || combined.includes("403: forbidden")) {
     return new AppError("YouTube blocked this format. Try Best available, or another quality.", 403);
   }
-  if (combined.includes("private") || combined.includes("login required") || combined.includes("sign in")) {
+  if (combined.includes("private") || combined.includes("login required")) {
     return new AppError("This post is private or requires a login.", 403);
   }
   if (combined.includes("geo") || combined.includes("not available in your")) {
@@ -45,7 +128,7 @@ function mapExtractorError(stdout, stderr) {
     combined.includes("impersonat")
   ) {
     return new AppError(
-      "This platform is blocking extraction right now. YouTube links work best; TikTok and Instagram often require a newer extractor.",
+      "This platform is blocking extraction right now. Update yt-dlp, or add cookies for YouTube/X.",
       422
     );
   }
@@ -275,7 +358,8 @@ function detectMediaType(entries) {
 }
 
 export async function resolveMedia(url, platform) {
-  const usePlaylist = platform === "instagram" || platform === "facebook";
+  const usePlaylist =
+    platform === "instagram" || platform === "facebook" || platform === "twitter";
   const playlistFlag = usePlaylist ? "--yes-playlist" : "--no-playlist";
   const { stdout } = await runYtdlp([
     "--dump-json",

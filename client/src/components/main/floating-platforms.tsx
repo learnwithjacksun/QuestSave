@@ -2,6 +2,7 @@ import {
   siFacebook,
   siInstagram,
   siPinterest,
+  siX,
   siYoutube,
 } from "simple-icons";
 import type { SimpleIcon } from "simple-icons";
@@ -16,7 +17,7 @@ const platforms: FloatingIcon[] = [
   // { icon: siTiktok, className: "top-[12%] left-[8%] size-10", delay: "0s" },
   { icon: siYoutube, className: "top-[20%] right-[10%] size-11", delay: "1.2s" },
   { icon: siInstagram, className: "top-[56%] left-[4%] size-10", delay: "2.4s" },
-  // { icon: siX, className: "top-[48%] right-[5%] size-9", delay: "0.8s" },
+  { icon: siX, className: "top-[48%] right-[5%] size-9", delay: "0.8s" },
   { icon: siPinterest, className: "bottom-[16%] left-[14%] size-10", delay: "1.8s" },
   { icon: siFacebook, className: "bottom-[14%] right-[12%] size-10", delay: "2.8s" },
 ];
