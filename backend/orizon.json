@@ -1,0 +1,23 @@
+{
+  "$schema": "https://orzn.io/schema/orizon.json",
+  "projectId": "proj_questsave_server",
+  "name": "questsave-server",
+  "framework": "node",
+  "servingMode": "server",
+  "productionBranch": "main",
+  "rootDirectory": "backend",
+  "url": "https://questsave-server.orzn.app",
+  "orizon": {
+    "dashboard": "https://dashboard.orizon.ng/projects/proj_questsave_server",
+    "api": "https://api.orizon.ng/api/v1",
+    "openapi": "https://api.orizon.ng/api/v1/openapi.json",
+    "mcp": {
+      "command": "orizon",
+      "args": [
+        "mcp"
+      ]
+    },
+    "docs": "https://orzn.io/docs",
+    "llms": "https://orzn.io/llms.txt"
+  }
+}
