@@ -8,7 +8,8 @@ interface SaveClipModalProps {
   onClose: () => void;
   onSaveAndDownload: () => void;
   onDownloadOnly: () => void;
-  busy?: boolean;
+  saving?: boolean;
+  downloading?: boolean;
 }
 
 export default function SaveClipModal({
@@ -16,9 +17,12 @@ export default function SaveClipModal({
   onClose,
   onSaveAndDownload,
   onDownloadOnly,
-  busy = false,
+  saving = false,
+  downloading = false,
 }: SaveClipModalProps) {
   if (!isOpen) return null;
+
+  const busy = saving || downloading;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Save this clip">
@@ -32,8 +36,12 @@ export default function SaveClipModal({
           onClick={onSaveAndDownload}
           className="btn btn-primary h-11 w-full rounded-xl gap-2"
         >
-          {busy ? <Loader className="animate-spin" size={18} /> : <Icon icon={CloudUploadIcon} size={18} />}
-          {busy ? "Saving..." : "Save and download"}
+          {saving ? (
+            <Loader className="animate-spin" size={18} />
+          ) : (
+            <Icon icon={CloudUploadIcon} size={18} />
+          )}
+          {saving ? "Saving..." : "Save and download"}
         </button>
         <button
           type="button"
@@ -41,8 +49,12 @@ export default function SaveClipModal({
           onClick={onDownloadOnly}
           className="btn h-11 w-full rounded-xl border border-line text-main hover:bg-hover gap-2"
         >
-          {busy ? <Loader className="animate-spin" size={18} /> : <Icon icon={Download01Icon} size={18} />}
-          {busy ? "Downloading..." : "Download only"}
+          {downloading ? (
+            <Loader className="animate-spin" size={18} />
+          ) : (
+            <Icon icon={Download01Icon} size={18} />
+          )}
+          {downloading ? "Downloading..." : "Download only"}
         </button>
       </div>
     </Modal>
