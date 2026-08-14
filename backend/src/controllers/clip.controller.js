@@ -6,6 +6,7 @@ import { downloadTikTok, isTikTokFormat, resolveTikTok } from "../services/tikto
 import { downloadMedia, resolveMedia } from "../services/ytdlp.js";
 import { AppError } from "../utils/AppError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { buildDownloadFilename } from "../utils/downloadFilename.js";
 
 const urlSchema = z.object({
   url: z.string().trim().min(1, "Paste a link first"),
@@ -45,21 +46,35 @@ export const resolveClip = asyncHandler(async (req, res) => {
 
 export const downloadClip = asyncHandler(async (req, res) => {
   const parsed = urlSchema
-    .extend({ formatId: z.string().trim().min(1, "Choose a download format") })
+    .extend({
+      formatId: z.string().trim().min(1, "Choose a download format"),
+      title: z.string().optional(),
+    })
     .safeParse(req.body);
 
   if (!parsed.success) {
     throw new AppError(parsed.error.issues[0]?.message || "Invalid request", 400);
   }
 
-  const { url } = detectPlatform(parsed.data.url);
+  const { platform, url } = detectPlatform(parsed.data.url);
   const formatId = sanitizeFormatId(parsed.data.formatId);
   const file = isTikTokFormat(formatId)
     ? await downloadTikTok(url, formatId)
     : await downloadMedia(url, formatId);
 
+  const title = parsed.data.title?.trim() || getResolved(url)?.title || "";
+  const ext = (file.filename || "").includes(".")
+    ? file.filename.split(".").pop()
+    : file.contentType?.includes("image")
+      ? "jpg"
+      : file.contentType?.includes("audio")
+        ? "mp3"
+        : "mp4";
+
+  const filename = buildDownloadFilename({ platform, title, ext });
+
   res.setHeader("Content-Type", file.contentType);
-  res.setHeader("Content-Disposition", `attachment; filename="${file.filename}"`);
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
   if (file.size) {
     res.setHeader("Content-Length", file.size);
   }

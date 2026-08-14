@@ -159,7 +159,7 @@ export default function Saves() {
       if (!formatId) {
         throw new Error("No download format available");
       }
-      await downloadClipFile(clip.sourceUrl, formatId);
+      await downloadClipFile(clip.sourceUrl, formatId, clip.title);
       toast.success("Download started");
     } catch (err) {
       toast.error(

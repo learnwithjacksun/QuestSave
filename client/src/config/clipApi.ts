@@ -23,11 +23,11 @@ export async function deleteClip(id: string) {
   await api.delete(`/api/clips/${id}`);
 }
 
-export async function downloadClipFile(url: string, formatId: string) {
+export async function downloadClipFile(url: string, formatId: string, title?: string) {
   try {
     const { data, headers } = await api.post(
       "/api/clips/download",
-      { url, formatId },
+      { url, formatId, title },
       { responseType: "blob" }
     );
 

@@ -44,7 +44,7 @@ export default function Home() {
     if (!preview || !activeFormatId) return;
     setDownloading(true);
     try {
-      await downloadClipFile(preview.sourceUrl, activeFormatId);
+      await downloadClipFile(preview.sourceUrl, activeFormatId, preview.title);
       toast.success("Download started");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : getApiError(err, "Download failed"));
@@ -69,7 +69,7 @@ export default function Home() {
           formatId: activeFormatId,
           mediaType: preview.mediaType,
         }),
-        downloadClipFile(preview.sourceUrl, activeFormatId),
+        downloadClipFile(preview.sourceUrl, activeFormatId, preview.title),
       ]);
       toast.success("Saved to your library");
     } catch (err) {
