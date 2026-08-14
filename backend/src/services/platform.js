@@ -4,7 +4,7 @@ const PLATFORM_HOSTS = {
   youtube: ["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be"],
   tiktok: ["tiktok.com", "www.tiktok.com", "vm.tiktok.com", "vt.tiktok.com", "m.tiktok.com"],
   instagram: ["instagram.com", "www.instagram.com", "instagr.am"],
-  twitter: ["twitter.com", "www.twitter.com", "x.com", "www.x.com", "mobile.twitter.com"],
+  twitter: ["twitter.com", "www.twitter.com", "x.com", "www.x.com", "mobile.twitter.com", "mobile.x.com"],
   facebook: [
     "facebook.com",
     "www.facebook.com",
