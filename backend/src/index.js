@@ -11,9 +11,11 @@ import mediaRoutes from "./routes/media.routes.js";
 
 const app = express();
 
+const allowedOrigins = ["https://questsave.orzn.app", "http://localhost:3000"];
+
 app.use(
   cors({
-    origin: true,
+    origin: allowedOrigins,
     credentials: true,
     exposedHeaders: ["Content-Disposition"],
   })
