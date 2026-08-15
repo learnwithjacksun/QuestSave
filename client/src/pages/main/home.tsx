@@ -9,6 +9,8 @@ import { getApiError } from "@/config/api";
 import useAuthStore from "@/store/useAuthStore";
 import type { ClipFormat, ClipPreview } from "@/types/clip";
 
+type ModalAction = "save-download" | "save" | "download" | null;
+
 function defaultFormatId(formats: ClipFormat[], mediaType: ClipPreview["mediaType"]) {
   if (mediaType === "image" || mediaType === "mixed") {
     const imageFormat = formats.find((fmt) => fmt.mediaKind === "image");
@@ -20,19 +22,30 @@ function defaultFormatId(formats: ClipFormat[], mediaType: ClipPreview["mediaTyp
 export default function Home() {
   const { user, pendingSave, setPendingSave, openOverlay } = useAuthStore();
   const [loading, setLoading] = useState(false);
-  const [modalAction, setModalAction] = useState<"save" | "download" | null>(null);
+  const [modalAction, setModalAction] = useState<ModalAction>(null);
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<ClipPreview | null>(null);
   const [formatId, setFormatId] = useState("");
   const [slideInfo, setSlideInfo] = useState<SelectedSlideInfo | null>(null);
   const [saveOpen, setSaveOpen] = useState(false);
   const savingRef = useRef(false);
+  const pendingKindRef = useRef<"save-download" | "save">("save-download");
 
   const selectedFormat = preview?.formats.find((fmt) => fmt.id === formatId);
   const activeFormatId =
     selectedFormat?.mediaKind === "image" && slideInfo?.downloadId
       ? slideInfo.downloadId
       : formatId;
+
+  const clearPreview = () => {
+    setPreview(null);
+    setSlideInfo(null);
+    setFormatId("");
+    setError("");
+    setSaveOpen(false);
+    setModalAction(null);
+    setPendingSave(false);
+  };
 
   const handleResolve = async (url: string) => {
     setLoading(true);
@@ -66,21 +79,41 @@ export default function Home() {
     }
   };
 
-  const runSaveAndDownload = async () => {
+  const persistClip = async () => {
+    if (!preview || !activeFormatId) return;
+    const thumbnail = slideInfo?.thumbnail || preview.thumbnail;
+    await saveClip({
+      url: preview.sourceUrl,
+      platform: preview.platform,
+      title: preview.title,
+      author: preview.author,
+      thumbnail,
+      formatId: activeFormatId,
+      mediaType: preview.mediaType,
+    });
+  };
+
+  const runSaveOnly = async () => {
     if (!preview || !activeFormatId) return;
     setModalAction("save");
     try {
-      const thumbnail = slideInfo?.thumbnail || preview.thumbnail;
+      await persistClip();
+      toast.success("Saved to your library");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : getApiError(err, "Could not save clip"));
+    } finally {
+      setModalAction(null);
+      setSaveOpen(false);
+      setPendingSave(false);
+    }
+  };
+
+  const runSaveAndDownload = async () => {
+    if (!preview || !activeFormatId) return;
+    setModalAction("save-download");
+    try {
       await Promise.all([
-        saveClip({
-          url: preview.sourceUrl,
-          platform: preview.platform,
-          title: preview.title,
-          author: preview.author,
-          thumbnail,
-          formatId: activeFormatId,
-          mediaType: preview.mediaType,
-        }),
+        persistClip(),
         downloadClipFile(preview.sourceUrl, activeFormatId, preview.title),
       ]);
       toast.success("Saved to your library");
@@ -93,20 +126,31 @@ export default function Home() {
     }
   };
 
-  const handleSaveAndDownload = () => {
+  const requireAuthThen = (kind: "save-download" | "save", action: () => void) => {
     if (!user) {
+      pendingKindRef.current = kind;
       setPendingSave(true);
       setSaveOpen(false);
       openOverlay();
       return;
     }
-    void runSaveAndDownload();
+    action();
+  };
+
+  const handleSaveAndDownload = () => {
+    requireAuthThen("save-download", () => void runSaveAndDownload());
+  };
+
+  const handleSaveOnly = () => {
+    requireAuthThen("save", () => void runSaveOnly());
   };
 
   useEffect(() => {
     if (user && pendingSave && preview && !savingRef.current) {
       savingRef.current = true;
-      void runSaveAndDownload().finally(() => {
+      const run =
+        pendingKindRef.current === "save" ? runSaveOnly : runSaveAndDownload;
+      void run().finally(() => {
         savingRef.current = false;
       });
     }
@@ -137,13 +181,22 @@ export default function Home() {
         )}
 
         {preview && !loading && (
-          <ClipPreviewCard
-            preview={preview}
-            selectedFormatId={formatId}
-            onFormatChange={setFormatId}
-            onSlideChange={setSlideInfo}
-            onDownload={() => setSaveOpen(true)}
-          />
+          <>
+            <ClipPreviewCard
+              preview={preview}
+              selectedFormatId={formatId}
+              onFormatChange={setFormatId}
+              onSlideChange={setSlideInfo}
+              onDownload={() => setSaveOpen(true)}
+            />
+            <button
+              type="button"
+              onClick={clearPreview}
+              className="mt-3 text-sm text-muted hover:text-main underline-offset-4 hover:underline"
+            >
+              Download another media
+            </button>
+          </>
         )}
 
         <QuickActions />
@@ -158,8 +211,10 @@ export default function Home() {
         isOpen={saveOpen}
         onClose={() => setSaveOpen(false)}
         onSaveAndDownload={handleSaveAndDownload}
+        onSaveOnly={handleSaveOnly}
         onDownloadOnly={() => void runDownload()}
-        saving={modalAction === "save"}
+        savingDownload={modalAction === "save-download"}
+        savingOnly={modalAction === "save"}
         downloading={modalAction === "download"}
       />
     </div>

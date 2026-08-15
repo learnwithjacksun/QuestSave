@@ -36,7 +36,21 @@ app.use((_req, _res, next) => {
 app.use(errorHandler);
 
 connectDb()
-  .then(() => {
+  .then(async () => {
+    try {
+      const { spawnSync } = await import("child_process");
+      const check = spawnSync(env.ytdlp.path, ["--version"], { encoding: "utf8" });
+      if (check.error?.code === "ENOENT") {
+        console.warn(
+          `[warn] yt-dlp not found at "${env.ytdlp.path}". YouTube/Instagram/Facebook/X/Pinterest resolve will fail until it is installed (TikTok can still work via the dedicated scraper).`
+        );
+      } else if (check.status === 0) {
+        console.log(`yt-dlp ${String(check.stdout || check.stderr).trim()}`);
+      }
+    } catch {
+      // ignore probe failures
+    }
+
     app.listen(env.port, () => {
       console.log(`QuestSave API running on : http://localhost:${env.port}`);
     });

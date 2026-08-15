@@ -102,16 +102,26 @@ function mapExtractorError(stdout, stderr) {
   if (
     combined.includes("sign in to confirm") ||
     combined.includes("confirm you're not a bot") ||
-    combined.includes("confirm you’re not a bot") ||
-    combined.includes("use --cookies")
+    combined.includes("confirm you’re not a bot")
   ) {
     return new AppError(
       "YouTube is blocking this server (bot check). Export cookies to YTDLP_COOKIES or set YTDLP_COOKIES_FROM_BROWSER, install deno/curl_cffi, then retry.",
       403
     );
   }
+  if (
+    combined.includes("use --cookies") ||
+    combined.includes("cookies-from-browser") ||
+    combined.includes("empty media response") ||
+    (combined.includes("login required") && combined.includes("instagram"))
+  ) {
+    return new AppError(
+      "This platform requires login cookies on the server. Set YTDLP_COOKIES to a Netscape cookies.txt export and retry.",
+      403
+    );
+  }
   if (combined.includes("http error 403") || combined.includes("403: forbidden")) {
-    return new AppError("YouTube blocked this format. Try Best available, or another quality.", 403);
+    return new AppError("Download was blocked for this format. Try Best or another quality.", 403);
   }
   if (combined.includes("private") || combined.includes("login required")) {
     return new AppError("This post is private or requires a login.", 403);
@@ -168,7 +178,7 @@ function runYtdlp(args, { timeoutMs = env.ytdlp.timeoutMs } = {}) {
         reject(
           new AppError(
             "yt-dlp is not installed on the server. Install yt-dlp and ffmpeg, then retry.",
-            500
+            503
           )
         );
         return;
@@ -253,6 +263,17 @@ function normalizeExt(ext, mediaKind) {
   return "mp4";
 }
 
+function qualityLabelFor({ height, formatId, mediaKind, ext }) {
+  if (mediaKind === "audio") return (ext || "MP3").toUpperCase();
+  if (mediaKind === "image") return (ext || "JPG").toUpperCase();
+  if (height && height > 0 && height < 9000) return `${height}p`;
+  const id = String(formatId || "").toLowerCase();
+  if (id === "bv*+ba/b" || id === "best") return "Best";
+  if (id === "hd" || /(^|[^a-z])hd([^a-z]|$)/.test(id)) return "HD";
+  if (id === "sd" || /(^|[^a-z])sd([^a-z]|$)/.test(id)) return "SD";
+  return (ext || "MP4").toUpperCase();
+}
+
 function mapFormats(entry, mediaType) {
   if (mediaType === "image") {
     return [
@@ -269,19 +290,34 @@ function mapFormats(entry, mediaType) {
 
   const raw = Array.isArray(entry.formats) ? entry.formats : [];
   /** @type {Map<string, object>} */
-  const byExt = new Map();
+  const byKey = new Map();
 
   const put = (option) => {
     const ext = normalizeExt(option.ext, option.mediaKind);
-    const current = byExt.get(ext);
-    if (!current || (option.height || 0) > (current.height || 0)) {
-      byExt.set(ext, {
+    const height = option.height && option.height < 9000 ? option.height : null;
+    const qualityLabel = qualityLabelFor({
+      height,
+      formatId: option.id,
+      mediaKind: option.mediaKind,
+      ext,
+    });
+    const key =
+      option.mediaKind === "video"
+        ? height
+          ? `video:h:${height}`
+          : `video:id:${String(option.id).toLowerCase()}`
+        : `${option.mediaKind}:${ext}`;
+    const current = byKey.get(key);
+    const rank = height || 0;
+    const currentRank = current?.height || 0;
+    if (!current || rank >= currentRank) {
+      byKey.set(key, {
         id: option.id,
         ext,
-        qualityLabel: ext.toUpperCase(),
+        qualityLabel,
         mediaKind: option.mediaKind,
         filesize: option.filesize ?? null,
-        height: option.height ?? null,
+        height,
       });
     }
   };
@@ -292,7 +328,7 @@ function mapFormats(entry, mediaType) {
       ext: "mp4",
       mediaKind: "video",
       filesize: null,
-      height: 99999,
+      height: null,
     });
   }
 
@@ -334,12 +370,23 @@ function mapFormats(entry, mediaType) {
     }
   }
 
-  const options = [...byExt.values()];
+  const options = [...byKey.values()];
+  const videoRank = (option) => {
+    if (option.qualityLabel === "Best") return 1_000_000;
+    if (option.height) return option.height;
+    if (option.qualityLabel === "HD") return 720;
+    if (option.qualityLabel === "SD") return 360;
+    const match = /^(\d+)p$/i.exec(option.qualityLabel || "");
+    return match ? Number(match[1]) : 0;
+  };
   options.sort((a, b) => {
     const order = { video: 0, image: 1, audio: 2 };
-    return (order[a.mediaKind] ?? 9) - (order[b.mediaKind] ?? 9);
+    const kindDiff = (order[a.mediaKind] ?? 9) - (order[b.mediaKind] ?? 9);
+    if (kindDiff) return kindDiff;
+    if (a.mediaKind === "video") return videoRank(b) - videoRank(a);
+    return 0;
   });
-  return options.slice(0, 8);
+  return options.slice(0, 12);
 }
 
 function detectMediaType(entries) {
