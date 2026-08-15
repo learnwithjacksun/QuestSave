@@ -373,7 +373,7 @@ export default function Saves() {
                   )}
                 </div>
 
-                <div className="p-4 flex flex-col gap-3 mt-auto">
+                <div className="p-2 lg:p-4 flex flex-col gap-3 mt-auto">
                   <div className="min-w-0">
                     <p className="text-xs uppercase tracking-wide text-primary font-medium">
                       {platformLabels[clip.platform] || clip.platform}
