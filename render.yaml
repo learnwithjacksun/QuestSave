@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: questsave-api
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: YTDLP_PATH
+        value: yt-dlp
+      - key: YTDLP_IMPERSONATE
+        value: chrome
+      - key: YTDLP_TIMEOUT_MS
+        value: "180000"
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CLIENT_ORIGIN
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: MAIL_FROM_NAME
+        value: QuestSave
+      - key: MAIL_FROM_EMAIL
+        value: noreply@questlabs.cc
+      - key: YTDLP_COOKIES
+        sync: false

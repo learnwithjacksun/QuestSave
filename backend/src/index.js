@@ -11,7 +11,11 @@ import mediaRoutes from "./routes/media.routes.js";
 
 const app = express();
 
-const allowedOrigins = ["https://questsave.orzn.app", "http://localhost:3000"];
+const allowedOrigins = [
+  ...new Set(
+    [env.clientOrigin, "https://questsave.orzn.app", "http://localhost:3000"].filter(Boolean)
+  ),
+];
 
 app.use(
   cors({
@@ -39,8 +43,8 @@ app.use(errorHandler);
 
 connectDb()
   .then(() => {
-    app.listen(env.port, () => {
-      console.log(`QuestSave API running on : http://localhost:${env.port}`);
+    app.listen(env.port, "0.0.0.0", () => {
+      console.log(`QuestSave API running on :${env.port}`);
     });
   })
   .catch((err) => {
