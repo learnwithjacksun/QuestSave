@@ -4,6 +4,7 @@ import { detectPlatform, sanitizeFormatId } from "../services/platform.js";
 import { getResolved, setResolved } from "../services/resolveCache.js";
 import { downloadTikTok, isTikTokFormat, resolveTikTok } from "../services/tiktok.js";
 import { downloadTwitter, isTwitterFormat, resolveTwitter } from "../services/twitter.js";
+import { downloadYouTube, isYouTubeFormat, resolveYouTube } from "../services/youtube.js";
 import { downloadMedia, resolveMedia } from "../services/ytdlp.js";
 import { AppError } from "../utils/AppError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -45,7 +46,9 @@ export const resolveClip = asyncHandler(async (req, res) => {
       ? await resolveTikTok(url)
       : platform === "twitter"
         ? await resolveTwitter(url)
-        : await resolveMedia(url, platform);
+        : platform === "youtube"
+          ? await resolveYouTube(url)
+          : await resolveMedia(url, platform);
   setResolved(url, preview);
   res.json(preview);
 });
@@ -68,7 +71,9 @@ export const downloadClip = asyncHandler(async (req, res) => {
     ? await downloadTikTok(url, formatId)
     : isTwitterFormat(formatId)
       ? await downloadTwitter(url, formatId)
-      : await downloadMedia(url, formatId);
+      : isYouTubeFormat(formatId)
+        ? await downloadYouTube(url, formatId)
+        : await downloadMedia(url, formatId);
 
   const title = parsed.data.title?.trim() || getResolved(url)?.title || "";
   const ext = (file.filename || "").includes(".")

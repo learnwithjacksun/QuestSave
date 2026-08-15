@@ -54,7 +54,7 @@ connectDb()
       });
       if (check.error?.code === "ENOENT") {
         console.warn(
-          `[warn] yt-dlp not found at "${env.ytdlp.path}". YouTube/Instagram/Facebook/X/Pinterest resolve will fail until it is installed (TikTok can still work via the dedicated scraper).`,
+          `[warn] yt-dlp not found at "${env.ytdlp.path}". Instagram/Facebook/Pinterest resolve will fail until it is installed (YouTube uses InnerTube first; TikTok and X have dedicated scrapers).`,
         );
       } else if (check.status === 0) {
         console.log(`yt-dlp ${String(check.stdout || check.stderr).trim()}`);
