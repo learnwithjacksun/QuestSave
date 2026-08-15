@@ -13,7 +13,11 @@ const app = express();
 
 const allowedOrigins = [
   ...new Set(
-    [env.clientOrigin, "https://questsave.orzn.app", "http://localhost:3000"].filter(Boolean)
+    [
+      env.clientOrigin,
+      "https://questsave.orzn.app",
+      "http://localhost:3000",
+    ].filter(Boolean),
   ),
 ];
 
@@ -22,7 +26,7 @@ app.use(
     origin: allowedOrigins,
     credentials: true,
     exposedHeaders: ["Content-Disposition"],
-  })
+  }),
 );
 app.use(cookieParser());
 app.use(express.json({ limit: "1mb" }));
@@ -42,18 +46,15 @@ app.use((_req, _res, next) => {
 app.use(errorHandler);
 
 connectDb()
-<<<<<<< HEAD
-  .then(() => {
-    app.listen(env.port, "0.0.0.0", () => {
-      console.log(`QuestSave API running on :${env.port}`);
-=======
   .then(async () => {
     try {
       const { spawnSync } = await import("child_process");
-      const check = spawnSync(env.ytdlp.path, ["--version"], { encoding: "utf8" });
+      const check = spawnSync(env.ytdlp.path, ["--version"], {
+        encoding: "utf8",
+      });
       if (check.error?.code === "ENOENT") {
         console.warn(
-          `[warn] yt-dlp not found at "${env.ytdlp.path}". YouTube/Instagram/Facebook/X/Pinterest resolve will fail until it is installed (TikTok can still work via the dedicated scraper).`
+          `[warn] yt-dlp not found at "${env.ytdlp.path}". YouTube/Instagram/Facebook/X/Pinterest resolve will fail until it is installed (TikTok can still work via the dedicated scraper).`,
         );
       } else if (check.status === 0) {
         console.log(`yt-dlp ${String(check.stdout || check.stderr).trim()}`);
@@ -64,7 +65,6 @@ connectDb()
 
     app.listen(env.port, () => {
       console.log(`QuestSave API running on : http://localhost:${env.port}`);
->>>>>>> 3b5ffde507d1d14efcb3d74b1ecf6b0ca6e6f98a
     });
   })
   .catch((err) => {
