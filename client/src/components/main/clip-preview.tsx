@@ -38,11 +38,18 @@ interface ClipPreviewCardProps {
 }
 
 function formatOptionLabel(fmt: ClipFormat) {
-  const ext = (fmt.ext || fmt.qualityLabel || "file").toUpperCase();
-  if (fmt.mediaKind === "video") return `Video (${ext})`;
-  if (fmt.mediaKind === "audio") return `Audio (${ext})`;
-  if (fmt.mediaKind === "image") return `Image (${ext})`;
-  return fmt.qualityLabel || ext;
+  const quality = fmt.qualityLabel || fmt.ext?.toUpperCase() || "FILE";
+  if (fmt.mediaKind === "video") {
+    if (quality === "Best") return "Best (MP4)";
+    if (/^\d+p$/i.test(quality) || quality === "HD" || quality === "SD") {
+      return `${quality} (MP4)`;
+    }
+    if (quality === "MP4") return "Video (MP4)";
+    return `${quality} (MP4)`;
+  }
+  if (fmt.mediaKind === "audio") return `Audio (${quality})`;
+  if (fmt.mediaKind === "image") return `Image (${quality})`;
+  return quality;
 }
 
 export default function ClipPreviewCard({
@@ -115,10 +122,17 @@ export default function ClipPreviewCard({
     label: formatOptionLabel(fmt),
   }));
 
-  const showFormatSelect = preview.formats.length > 1;
+  const showFormatSelect = preview.formats.length > 0;
 
   const downloadLabel = (() => {
-    if (selectedKind === "video") return "Download MP4";
+    if (selectedKind === "video") {
+      const quality = selectedFormat?.qualityLabel || "MP4";
+      if (quality === "Best") return "Download Best";
+      if (/^\d+p$/i.test(quality) || quality === "HD" || quality === "SD") {
+        return `Download ${quality}`;
+      }
+      return "Download MP4";
+    }
     if (selectedKind === "audio") {
       return `Download ${(selectedFormat?.ext || "mp3").toUpperCase()}`;
     }
