@@ -112,6 +112,7 @@ export default function FeedSlide({
           autoplay={active}
           mimeType={mimeType}
           className="h-full questsave-player-cover"
+          onError={(message) => setError(message || "Could not load video")}
         />
       ) : poster ? (
         <img src={poster} alt="" className="h-full w-full object-cover" />
