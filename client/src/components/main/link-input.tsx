@@ -110,10 +110,10 @@ export default function LinkInput({
             type="button"
             onClick={handlePaste}
             title="Paste from clipboard"
-            className="h-9 w-fit flex items-center justify-center gap-1 rounded-full text-muted hover:text-main hover:bg-hover transition-colors"
+            className="h-9 px-4 flex items-center justify-center gap-1 rounded-full text-muted hover:text-main hover:bg-hover transition-colors"
           >
             <Icon icon={ClipboardCopyIcon} size={18} />{" "}
-            <span className="hidden lg:block">Paste</span>
+            <span>Paste</span>
           </button>
 
           <button

@@ -202,8 +202,7 @@ export default function Home() {
         <QuickActions />
 
         <p className="mt-8 text-sm text-muted max-w-md mx-auto">
-          Paste a link from TikTok, Instagram, Twitter/X, YouTube, Facebook,
-          Pinterest, or other platforms to save videos and images.
+          Paste a link from TikTok, Instagram, Twitter/X, YouTube, Facebook platforms to save videos and images.
         </p>
       </div>
 
