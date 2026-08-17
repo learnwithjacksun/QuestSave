@@ -15,7 +15,7 @@ app.set("trust proxy", 1);
 
 app.use(
   cors({
-    origin: ["https://questsave.orzn.app","http://localhost:3000"]
+    origin: ["https://questsave.orzn.app","http://localhost:3000"],
     credentials: true,
     exposedHeaders: ["Content-Disposition", "Content-Range", "Accept-Ranges", "Content-Length"],
   }),
