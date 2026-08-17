@@ -34,6 +34,11 @@ Copy these from your current Orizon backend into the Render service:
 | `YTDLP_IMPERSONATE` | `chrome` (required on Render IPs) |
 | `YTDLP_TIMEOUT_MS` | `180000` |
 | `YTDLP_COOKIES` | `/etc/secrets/cookies.txt` after you add the secret file (see below) |
+| `RAPIDAPI_KEY` | RapidAPI key subscribed to the YouTube, Instagram, and Facebook APIs below |
+| `RAPIDAPI_YOUTUBE_HOST` | `ytstream-download-youtube-videos.p.rapidapi.com` |
+| `RAPIDAPI_INSTAGRAM_HOST` | `instagram-post-reels-stories-downloader-api.p.rapidapi.com` |
+| `RAPIDAPI_FACEBOOK_HOST` | `new-facebook-downloader-reels-watch-share-links.p.rapidapi.com` |
+| `FFMPEG_PATH` | `ffmpeg` (already in the Docker image) |
 
 Do not set `YTDLP_COOKIES_FROM_BROWSER` on Render — there is no Chrome profile in the container.
 
@@ -49,24 +54,33 @@ Rebuild/redeploy the client. CORS already allows `https://questsave.orzn.app` an
 
 Local development is unchanged: `VITE_BASE_URL=http://localhost:4000`.
 
-## 4. YouTube / Instagram cookies (required on Render)
+## 4. YouTube / Instagram / Facebook (RapidAPI)
 
-Render datacenter IPs are often blocked. After yt-dlp is installed you will still see bot-check errors until cookies are present.
+Set `RAPIDAPI_KEY` from RapidAPI and subscribe that same key to all three:
 
-1. Create a dedicated Google/Instagram account (not your personal one).
+- [YTStream (YouTube)](https://rapidapi.com/ytjar/api/ytstream-download-youtube-videos)
+- [Facebook downloader](https://rapidapi.com/gapi-social-media-apis-gapi-social-media-apis/api/new-facebook-downloader-reels-watch-share-links)
+- [Instagram downloader](https://rapidapi.com/diyorbekkanal/api/instagram-post-reels-stories-downloader-api)
+
+YouTube, Instagram, and Facebook no longer use yt-dlp. YouTube only exposes progressive formats that already include audio (often 360p).
+
+## 5. Pinterest / last-resort cookies (optional)
+
+Pinterest still uses yt-dlp. TikTok and X keep yt-dlp only as a last-resort fallback.
+
+Render datacenter IPs are often blocked by those extractors until cookies are present.
+
+1. Create a dedicated account (not your personal one).
 2. In a browser, sign in and export a **Netscape** `cookies.txt` (e.g. the "Get cookies.txt LOCALLY" extension).
 3. In Render: **Environment → Secret Files** → add a file named `cookies.txt` and paste the export.
 4. Set `YTDLP_COOKIES=/etc/secrets/cookies.txt`.
 5. Keep `YTDLP_IMPERSONATE=chrome` (needs `curl_cffi`, already in the image).
 
-Cookies expire every few months. Re-export when YouTube/Instagram start failing again.
+Cookies expire every few months. Re-export when Pinterest (or TikTok/X fallback) starts failing again.
 
-Instagram and Facebook often need cookies from a logged-in session in the same file.
-
-## 5. After deploy
+## 6. After deploy
 
 - `GET https://YOUR-SERVICE.onrender.com/api/health` should return `{ "ok": true }`.
-- TikTok / X can work without cookies. YouTube, Instagram, Facebook, and Pinterest usually need the cookies file.
-- Rebuild the image periodically (`pip` install in the Dockerfile) so yt-dlp stays current.
-
-If YouTube still returns a bot-check after cookies + impersonate, the remaining options are a residential proxy or a small VPS whose IP is less burned than shared PaaS ranges.
+- TikTok / X can work without RapidAPI. YouTube, Instagram, and Facebook need `RAPIDAPI_KEY`.
+- Pinterest still uses yt-dlp and may need the cookies file.
+- Rebuild the image periodically (`pip` install in the Dockerfile) so yt-dlp stays current for Pinterest / fallbacks.

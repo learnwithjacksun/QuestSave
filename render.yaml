@@ -29,3 +29,11 @@ services:
         value: noreply@questlabs.cc
       - key: YTDLP_COOKIES
         sync: false
+      - key: RAPIDAPI_KEY
+        sync: false
+      - key: RAPIDAPI_YOUTUBE_HOST
+        value: ytstream-download-youtube-videos.p.rapidapi.com
+      - key: RAPIDAPI_INSTAGRAM_HOST
+        value: instagram-post-reels-stories-downloader-api.p.rapidapi.com
+      - key: RAPIDAPI_FACEBOOK_HOST
+        value: new-facebook-downloader-reels-watch-share-links.p.rapidapi.com

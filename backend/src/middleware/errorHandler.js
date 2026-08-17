@@ -3,7 +3,7 @@ import { AppError } from "../utils/AppError.js";
 
 export function errorHandler(err, _req, res, _next) {
   const status = err instanceof AppError ? err.statusCode : err.statusCode || 500;
-  // Always surface AppError messages (including missing yt-dlp / cookie guidance).
+  // Always surface AppError messages (including missing RapidAPI / yt-dlp guidance).
   const message =
     err instanceof AppError
       ? err.message

@@ -39,13 +39,14 @@ interface ClipPreviewCardProps {
 
 function formatOptionLabel(fmt: ClipFormat) {
   const quality = fmt.qualityLabel || fmt.ext?.toUpperCase() || "FILE";
+  const ext = (fmt.ext || "mp4").toUpperCase();
   if (fmt.mediaKind === "video") {
-    if (quality === "Best") return "Best (MP4)";
+    if (quality === "Best") return `Best (${ext})`;
     if (/^\d+p$/i.test(quality) || quality === "HD" || quality === "SD") {
-      return `${quality} (MP4)`;
+      return `${quality} (${ext})`;
     }
-    if (quality === "MP4") return "Video (MP4)";
-    return `${quality} (MP4)`;
+    if (quality === ext) return `Video (${ext})`;
+    return `${quality} (${ext})`;
   }
   if (fmt.mediaKind === "audio") return `Audio (${quality})`;
   if (fmt.mediaKind === "image") return `Image (${quality})`;

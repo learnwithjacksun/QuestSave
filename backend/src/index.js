@@ -54,13 +54,19 @@ connectDb()
       });
       if (check.error?.code === "ENOENT") {
         console.warn(
-          `[warn] yt-dlp not found at "${env.ytdlp.path}". Instagram/Facebook/Pinterest resolve will fail until it is installed (YouTube uses InnerTube first; TikTok and X have dedicated scrapers).`,
+          `[warn] yt-dlp not found at "${env.ytdlp.path}". Pinterest resolve will fail until it is installed (TikTok and X keep it as a last-resort fallback).`,
         );
       } else if (check.status === 0) {
         console.log(`yt-dlp ${String(check.stdout || check.stderr).trim()}`);
       }
     } catch {
       // ignore probe failures
+    }
+
+    if (!env.rapidApi.key) {
+      console.warn(
+        "[warn] RAPIDAPI_KEY is not set. YouTube, Instagram, and Facebook downloads will fail until it is configured.",
+      );
     }
 
     app.listen(env.port, () => {
