@@ -125,6 +125,88 @@ export async function getClipStreamSrc(clipId: string) {
   return data.src || "";
 }
 
+export interface PlaybackSource {
+  src: string;
+  type: string;
+  revoke: () => void;
+}
+
+async function blobToPlayback(blob: Blob, contentType?: string): Promise<PlaybackSource> {
+  const headerType = String(contentType || blob.type || "").toLowerCase();
+  const maybeError =
+    headerType.includes("json") ||
+    headerType.includes("text/html") ||
+    headerType.includes("text/plain") ||
+    !headerType;
+
+  if (maybeError) {
+    const prefix = (await blob.slice(0, 64).text()).trim();
+    if (prefix.startsWith("{") || prefix.startsWith("<")) {
+      const text = await blob.text();
+      try {
+        const json = JSON.parse(text) as { message?: string };
+        throw new Error(json.message || "Could not load video");
+      } catch (err) {
+        if (err instanceof SyntaxError) {
+          throw new Error("Could not load video");
+        }
+        throw err;
+      }
+    }
+  }
+
+  const mime = headerType.includes("mpegurl")
+    ? "application/x-mpegURL"
+    : headerType.includes("webm")
+      ? "video/webm"
+      : headerType.includes("audio/")
+        ? headerType.split(";")[0]
+        : "video/mp4";
+  const src = URL.createObjectURL(blob);
+  return {
+    src,
+    type: mime,
+    revoke: () => URL.revokeObjectURL(src),
+  };
+}
+
+export async function getClipPlayback(clipId: string): Promise<PlaybackSource> {
+  const { data } = await api.get<{ token?: string }>(`/api/clips/${clipId}/stream-access`);
+  if (!data.token) {
+    throw new Error("Could not start stream");
+  }
+
+  try {
+    const response = await api.get(`/api/clips/${clipId}/stream`, {
+      params: { token: data.token },
+      responseType: "blob",
+      timeout: 180_000,
+    });
+    return blobToPlayback(response.data as Blob, response.headers["content-type"]);
+  } catch (error) {
+    if (axiosErrorBlob(error)) {
+      throw new Error(await readBlobError(error));
+    }
+    throw new Error(getApiError(error, "Could not load video"));
+  }
+}
+
+export async function getPreviewPlayback(url: string, formatId: string): Promise<PlaybackSource> {
+  try {
+    const response = await api.get("/api/clips/preview/stream", {
+      params: { url, formatId },
+      responseType: "blob",
+      timeout: 180_000,
+    });
+    return blobToPlayback(response.data as Blob, response.headers["content-type"]);
+  } catch (error) {
+    if (axiosErrorBlob(error)) {
+      throw new Error(await readBlobError(error));
+    }
+    throw new Error(getApiError(error, "Could not load video"));
+  }
+}
+
 function axiosErrorBlob(error: unknown): error is { response: { data: Blob } } {
   return (
     typeof error === "object" &&
