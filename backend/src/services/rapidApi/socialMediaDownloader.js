@@ -596,6 +596,21 @@ function pickMedia(cached, formatId) {
   return firstVideo || Object.values(cached.media)[0] || null;
 }
 
+export async function resolveSocialMediaPlayUrl(url, formatId, platform) {
+  let cached = getCache(url, platform);
+  if (!cached?.media?.[formatId] && !cached?.media?.["rap:best"]) {
+    await resolveSocialMedia(url, platform);
+    cached = getCache(url, platform);
+  }
+
+  const entry = pickMedia(cached, formatId);
+  if (!entry?.videoUrl) {
+    throw new AppError("Could not resolve a playable URL for this post.", 422);
+  }
+
+  return entry.videoUrl;
+}
+
 export async function downloadSocialMedia(url, formatId, platform) {
   let cached = getCache(url, platform);
   if (!cached?.media?.[formatId] && !cached?.media?.["rap:best"]) {

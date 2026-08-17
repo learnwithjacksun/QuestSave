@@ -55,5 +55,18 @@ export interface SavedClip {
   thumbnail: string;
   formatId?: string;
   mediaType: MediaType | string;
+  playUrl?: string;
   createdAt: string;
 }
+
+export interface SharedClip {
+  shareId: string;
+  sharedAt: string;
+  sharedBy: {
+    id: string;
+    username: string;
+  };
+  clip: SavedClip;
+}
+
+export type LibraryTab = "saved" | "shared";

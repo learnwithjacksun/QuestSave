@@ -8,6 +8,7 @@ import { AppError } from "./utils/AppError.js";
 import authRoutes from "./routes/auth.routes.js";
 import clipRoutes from "./routes/clip.routes.js";
 import mediaRoutes from "./routes/media.routes.js";
+import shareRoutes from "./routes/share.routes.js";
 
 const app = express();
 
@@ -37,6 +38,7 @@ app.get("/api/health", (_req, res) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/clips", clipRoutes);
+app.use("/api/shares", shareRoutes);
 app.use("/api/media", mediaRoutes);
 
 app.use((_req, _res, next) => {
