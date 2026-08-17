@@ -21,8 +21,8 @@ export const navItems: NavItem[] = [
     description: "Save videos & images from social media links",
   },
   {
-    label: "Saves",
-    path: "/saves",
+    label: "Library",
+    path: "/library",
     icon: Bookmark02Icon,
     description: "Your saved clips and downloads",
   },
