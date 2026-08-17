@@ -11,6 +11,7 @@ import mediaRoutes from "./routes/media.routes.js";
 import shareRoutes from "./routes/share.routes.js";
 
 const app = express();
+app.set("trust proxy", 1);
 
 const allowedOrigins = [
   ...new Set(

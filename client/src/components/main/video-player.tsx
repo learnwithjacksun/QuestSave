@@ -13,6 +13,16 @@ interface VideoPlayerProps {
   className?: string;
 }
 
+function sourceType(src: string) {
+  const value = src.toLowerCase();
+  if (value.includes(".m3u8") || value.includes("mpegurl")) {
+    return "application/x-mpegURL";
+  }
+  if (value.includes(".webm")) return "video/webm";
+  if (value.includes(".mp3") || value.includes("audio")) return "audio/mpeg";
+  return "video/mp4";
+}
+
 export default function VideoPlayer({
   src,
   poster,
@@ -20,70 +30,48 @@ export default function VideoPlayer({
   autoplay = false,
   className = "",
 }: VideoPlayerProps) {
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const placeholderRef = useRef<HTMLDivElement | null>(null);
   const playerRef = useRef<Player | null>(null);
 
   useEffect(() => {
-    if (!videoRef.current) return;
+    const placeholder = placeholderRef.current;
+    if (!placeholder || !src) return;
 
-    const player = videojs(videoRef.current, {
+    const videoEl = document.createElement("video-js");
+    videoEl.classList.add("vjs-big-play-centered");
+    videoEl.setAttribute("playsinline", "true");
+    placeholder.appendChild(videoEl);
+
+    const player = videojs(videoEl, {
       controls: true,
-      responsive: true,
+      preload: "auto",
+      autoplay: autoplay ? "muted" : false,
       fluid: !vertical,
       fill: vertical,
-      preload: "auto",
+      poster,
       playbackRates: [0.5, 0.75, 1, 1.25, 1.5, 2],
       controlBar: {
         pictureInPictureToggle: true,
         remainingTimeDisplay: true,
       },
+      sources: [{ src, type: sourceType(src) }],
     });
 
     playerRef.current = player;
 
     return () => {
-      if (playerRef.current) {
-        playerRef.current.dispose();
-        playerRef.current = null;
-      }
+      player.dispose();
+      playerRef.current = null;
+      placeholder.replaceChildren();
     };
-  }, [vertical]);
-
-  useEffect(() => {
-    const player = playerRef.current;
-    if (!player || !src) return;
-
-    player.src({ src, type: "video/mp4" });
-    if (poster) player.poster(poster);
-  }, [src, poster]);
-
-  useEffect(() => {
-    const player = playerRef.current;
-    if (!player) return;
-
-    if (autoplay) {
-      const play = player.play();
-      if (play && typeof play.catch === "function") {
-        play.catch(() => {
-          player.muted(true);
-          void player.play();
-        });
-      }
-    } else {
-      player.pause();
-    }
-  }, [autoplay, src]);
+  }, [src, poster, vertical, autoplay]);
 
   return (
     <div
       data-vjs-player
       className={`questsave-player ${vertical ? "questsave-player-vertical" : ""} ${className}`}
     >
-      <video
-        ref={videoRef}
-        className="video-js vjs-big-play-centered"
-        playsInline
-      />
+      <div ref={placeholderRef} className="h-full w-full" />
     </div>
   );
 }
