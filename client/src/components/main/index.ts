@@ -5,3 +5,6 @@ export { default as QuickActions } from "./quick-actions";
 export { default as FloatingPlatforms } from "./floating-platforms";
 export { default as ClipPreviewCard } from "./clip-preview";
 export { default as SaveClipModal } from "./save-clip-modal";
+export { default as ShareClipModal } from "./share-clip-modal";
+export { default as WatchModal } from "./watch-modal";
+export { default as VideoPlayer } from "./video-player";

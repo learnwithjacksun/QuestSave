@@ -1,5 +1,5 @@
 import api, { getApiError } from "@/config/api";
-import type { AuthUser, ClipPreview, SavedClip } from "@/types/clip";
+import type { AuthUser, ClipPreview, SavedClip, SharedClip } from "@/types/clip";
 
 export async function resolveClip(url: string) {
   const { data } = await api.post<ClipPreview>("/api/clips/resolve", { url });
@@ -83,6 +83,35 @@ export async function logout() {
 export async function fetchSavedClips() {
   const { data } = await api.get<{ clips: SavedClip[] }>("/api/clips");
   return data.clips;
+}
+
+export async function fetchReceivedShares() {
+  const { data } = await api.get<{ shares: SharedClip[] }>("/api/shares/received");
+  return data.shares;
+}
+
+export async function shareClip(clipId: string, username: string) {
+  const { data } = await api.post<{ share: { id: string; username: string } }>(
+    "/api/shares",
+    { clipId, username }
+  );
+  return data.share;
+}
+
+export async function removeShare(shareId: string) {
+  await api.delete(`/api/shares/${shareId}`);
+}
+
+export async function getPreviewStreamSrc(url: string, formatId: string) {
+  const { data } = await api.get<{ src: string }>("/api/clips/preview/stream-url", {
+    params: { url, formatId },
+  });
+  return data.src;
+}
+
+export async function getClipStreamSrc(clipId: string) {
+  const { data } = await api.get<{ src: string }>(`/api/clips/${clipId}/stream-access`);
+  return data.src;
 }
 
 function axiosErrorBlob(error: unknown): error is { response: { data: Blob } } {

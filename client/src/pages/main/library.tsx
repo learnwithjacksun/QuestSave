@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import clsx from "clsx";
 import { Loader } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -8,20 +9,25 @@ import {
   Delete02Icon,
   Download01Icon,
   Link01Icon,
+  PlayCircleIcon,
   Search01Icon,
+  Share08Icon,
 } from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/main";
+import { Icon, ShareClipModal, WatchModal } from "@/components/main";
 import Modal from "@/components/ui/modal";
 import {
   deleteClip,
   downloadClipFile,
+  fetchReceivedShares,
   fetchSavedClips,
+  getClipStreamSrc,
+  removeShare,
   resolveClip,
 } from "@/config/clipApi";
 import { getApiError } from "@/config/api";
 import { proxiedImageUrl } from "@/helpers/proxiedImageUrl";
 import useAuthStore from "@/store/useAuthStore";
-import type { SavedClip } from "@/types/clip";
+import type { LibraryTab, SavedClip, SharedClip } from "@/types/clip";
 
 const platformLabels: Record<string, string> = {
   tiktok: "TikTok",
@@ -52,6 +58,11 @@ const DATE_FILTERS = [
 
 type DateFilter = (typeof DATE_FILTERS)[number]["value"];
 
+const LIBRARY_TABS: { value: LibraryTab; label: string }[] = [
+  { value: "saved", label: "Saved" },
+  { value: "shared", label: "Shared with me" },
+];
+
 function formatSavedDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", {
     month: "short",
@@ -75,18 +86,40 @@ function matchesDate(iso: string, filter: DateFilter) {
   return true;
 }
 
+function isWatchable(clip: SavedClip) {
+  return clip.mediaType === "video" || clip.mediaType === "mixed";
+}
+
 export default function Library() {
   const { user, hydrated, openOverlay } = useAuthStore();
   const [searchParams, setSearchParams] = useSearchParams();
   const focusId = searchParams.get("id");
+  const tabParam = searchParams.get("tab");
+  const activeTab: LibraryTab = tabParam === "shared" ? "shared" : "saved";
+
   const [clips, setClips] = useState<SavedClip[]>([]);
+  const [sharedClips, setSharedClips] = useState<SharedClip[]>([]);
   const [loading, setLoading] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [removingShareId, setRemovingShareId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SavedClip | null>(null);
+  const [shareTarget, setShareTarget] = useState<SavedClip | null>(null);
+  const [watchTarget, setWatchTarget] = useState<SavedClip | null>(null);
   const [search, setSearch] = useState("");
   const [platform, setPlatform] = useState("all");
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
+
+  const setActiveTab = (tab: LibraryTab) => {
+    const next = new URLSearchParams(searchParams);
+    if (tab === "saved") {
+      next.delete("tab");
+    } else {
+      next.set("tab", tab);
+    }
+    next.delete("id");
+    setSearchParams(next, { replace: true });
+  };
 
   const clearFocusId = () => {
     if (!focusId) return;
@@ -95,42 +128,44 @@ export default function Library() {
     setSearchParams(next, { replace: true });
   };
 
-  useEffect(() => {
-    if (!focusId) return;
-    setSearch("");
-    setPlatform("all");
-    setDateFilter("all");
-  }, [focusId]);
-
-  useEffect(() => {
-    if (!hydrated || !user) {
+  const loadLibrary = useCallback(async () => {
+    if (!user) {
       setClips([]);
+      setSharedClips([]);
       setLoading(false);
       return;
     }
 
-    let mounted = true;
     setLoading(true);
-    fetchSavedClips()
-      .then((data) => {
-        if (mounted) setClips(data);
-      })
-      .catch((err) => {
-        if (mounted) {
-          setClips([]);
-          toast.error(getApiError(err, "Could not load your library"));
-        }
-      })
-      .finally(() => {
-        if (mounted) setLoading(false);
-      });
+    try {
+      const [saved, received] = await Promise.all([
+        fetchSavedClips(),
+        fetchReceivedShares(),
+      ]);
+      setClips(saved);
+      setSharedClips(received);
+    } catch (err) {
+      setClips([]);
+      setSharedClips([]);
+      toast.error(getApiError(err, "Could not load your library"));
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
 
-    return () => {
-      mounted = false;
-    };
-  }, [hydrated, user]);
+  useEffect(() => {
+    if (!focusId || activeTab !== "saved") return;
+    setSearch("");
+    setPlatform("all");
+    setDateFilter("all");
+  }, [focusId, activeTab]);
 
-  const filtered = useMemo(() => {
+  useEffect(() => {
+    if (!hydrated) return;
+    void loadLibrary();
+  }, [hydrated, loadLibrary]);
+
+  const filteredSaved = useMemo(() => {
     if (focusId) {
       return clips.filter((clip) => clip.id === focusId);
     }
@@ -147,6 +182,21 @@ export default function Library() {
       );
     });
   }, [clips, search, platform, dateFilter, focusId]);
+
+  const filteredShared = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return sharedClips.filter(({ clip, sharedBy }) => {
+      if (platform !== "all" && clip.platform !== platform) return false;
+      if (!matchesDate(clip.createdAt, dateFilter)) return false;
+      if (!q) return true;
+      return (
+        clip.title.toLowerCase().includes(q) ||
+        clip.author.toLowerCase().includes(q) ||
+        clip.sourceUrl.toLowerCase().includes(q) ||
+        sharedBy.username.toLowerCase().includes(q)
+      );
+    });
+  }, [sharedClips, search, platform, dateFilter]);
 
   const handleDownload = async (clip: SavedClip) => {
     setDownloadingId(clip.id);
@@ -187,6 +237,162 @@ export default function Library() {
       setDeletingId(null);
     }
   };
+
+  const handleRemoveShare = async (shareId: string) => {
+    setRemovingShareId(shareId);
+    const previous = sharedClips;
+    setSharedClips((list) => list.filter((item) => item.shareId !== shareId));
+    try {
+      await removeShare(shareId);
+      toast.success("Removed from Shared with me");
+    } catch (err) {
+      setSharedClips(previous);
+      toast.error(getApiError(err, "Could not remove shared clip"));
+    } finally {
+      setRemovingShareId(null);
+    }
+  };
+
+  const renderClipCard = (
+    clip: SavedClip,
+    options: {
+      key: string;
+      busy: boolean;
+      removing?: boolean;
+      meta?: string;
+      onDelete?: () => void;
+      onShare?: () => void;
+      onRemoveShare?: () => void;
+    }
+  ) => (
+    <li
+      key={options.key}
+      className="rounded-2xl border border-line bg-surface/60 overflow-hidden flex flex-col"
+    >
+      <div className="relative bg-hover aspect-video center lg:max-h-[200px] max-h-[100px]">
+        {clip.thumbnail ? (
+          <img
+            src={proxiedImageUrl(clip.thumbnail)}
+            alt={clip.title || "Saved clip"}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <Icon icon={Bookmark02Icon} size={28} className="text-muted" />
+        )}
+        {isWatchable(clip) && (
+          <button
+            type="button"
+            title="Watch"
+            onClick={() => setWatchTarget(clip)}
+            className="absolute inset-0 center bg-black/20 opacity-0 hover:opacity-100 transition-opacity"
+          >
+            <span className="h-10 w-10 rounded-full bg-primary/90 center text-white">
+              <Icon icon={PlayCircleIcon} size={22} />
+            </span>
+          </button>
+        )}
+      </div>
+
+      <div className="p-2 lg:p-4 flex flex-col gap-3 mt-auto">
+        <div className="min-w-0">
+          <p className="text-xs uppercase tracking-wide text-primary font-medium">
+            {platformLabels[clip.platform] || clip.platform}
+          </p>
+          <h2 className="text-[15px] font-medium text-main truncate mt-0.5">
+            {clip.title || "Untitled"}
+          </h2>
+          {clip.author && (
+            <p className="text-sm text-muted truncate">{clip.author}</p>
+          )}
+          {options.meta && (
+            <p className="text-xs text-muted mt-1 truncate">{options.meta}</p>
+          )}
+          <p className="text-xs text-muted mt-1">{formatSavedDate(clip.createdAt)}</p>
+        </div>
+
+        <div className="flex gap-2 flex-col">
+          <div className="flex gap-2">
+            {isWatchable(clip) && (
+              <button
+                type="button"
+                onClick={() => setWatchTarget(clip)}
+                className="btn h-10 min-h-8 lg:min-h-10 flex-1 rounded-md border border-line text-main hover:bg-hover text-sm gap-1.5"
+              >
+                <Icon icon={PlayCircleIcon} size={16} />
+                Watch
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => void handleDownload(clip)}
+              disabled={options.busy || downloadingId !== null || options.removing}
+              className="btn btn-primary h-10 min-h-8 lg:min-h-10 flex-1 rounded-md text-sm gap-1.5"
+            >
+              {options.busy ? (
+                <Loader className="animate-spin" size={16} />
+              ) : (
+                <Icon icon={Download01Icon} size={16} />
+              )}
+              {options.busy ? "Downloading..." : "Download"}
+            </button>
+          </div>
+          <div className="flex gap-2">
+            {options.onShare && (
+              <button
+                type="button"
+                title="Share"
+                onClick={options.onShare}
+                disabled={options.busy || options.removing}
+                className="btn h-8 lg:h-10 min-h-8 lg:min-h-10 flex-1 rounded-md border border-line text-main hover:bg-hover text-sm gap-1.5"
+              >
+                <Icon icon={Share08Icon} size={16} />
+                Share
+              </button>
+            )}
+            <a
+              href={clip.sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Open original"
+              className="btn h-8 lg:h-10 min-h-8 lg:min-h-10 lg:w-10 w-full rounded-md border border-line text-main hover:bg-hover"
+            >
+              <Icon icon={Link01Icon} size={16} />
+            </a>
+            {options.onDelete && (
+              <button
+                type="button"
+                title="Delete"
+                onClick={options.onDelete}
+                disabled={options.removing || options.busy}
+                className="btn h-8 lg:h-10 min-h-8 lg:min-h-10 lg:w-10 w-full rounded-md border border-line text-main hover:bg-hover hover:text-red-500"
+              >
+                {options.removing ? (
+                  <Loader className="animate-spin" size={16} />
+                ) : (
+                  <Icon icon={Delete02Icon} size={16} />
+                )}
+              </button>
+            )}
+            {options.onRemoveShare && (
+              <button
+                type="button"
+                title="Remove"
+                onClick={options.onRemoveShare}
+                disabled={options.removing || options.busy}
+                className="btn h-8 lg:h-10 min-h-8 lg:min-h-10 lg:w-10 w-full rounded-md border border-line text-main hover:bg-hover hover:text-red-500"
+              >
+                {options.removing ? (
+                  <Loader className="animate-spin" size={16} />
+                ) : (
+                  <Icon icon={Delete02Icon} size={16} />
+                )}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </li>
+  );
 
   if (!hydrated) {
     return (
@@ -231,7 +437,10 @@ export default function Library() {
     );
   }
 
-  if (clips.length === 0) {
+  const activeItems = activeTab === "saved" ? filteredSaved : filteredShared;
+  const isEmptyLibrary = clips.length === 0 && sharedClips.length === 0;
+
+  if (isEmptyLibrary) {
     return (
       <div className="flex flex-col items-center justify-center min-h-full px-4 pb-16">
         <div className="w-full max-w-lg mx-auto text-center">
@@ -256,28 +465,34 @@ export default function Library() {
   return (
     <div className="w-full max-w-5xl mx-auto px-4 pb-16">
       <div className="mb-6">
-        <h1 className="text-2xl md:text-3xl font-medium text-main">
-          Your Library
-        </h1>
+        <h1 className="text-2xl md:text-3xl font-medium text-main">Your Library</h1>
         <p className="text-sm text-muted mt-1">
-          {focusId
-            ? filtered.length
-              ? "Showing 1 clip from Recent"
-              : "That clip was not found"
-            : `${filtered.length} of ${clips.length} clip${clips.length === 1 ? "" : "s"}`}
-          {focusId ? (
-            <>
-              {" · "}
-              <button
-                type="button"
-                onClick={clearFocusId}
-                className="text-primary hover:underline"
-              >
-                Show all
-              </button>
-            </>
-          ) : null}
+          {activeTab === "saved"
+            ? focusId
+              ? filteredSaved.length
+                ? "Showing 1 clip from Recent"
+                : "That clip was not found"
+              : `${filteredSaved.length} of ${clips.length} saved clip${clips.length === 1 ? "" : "s"}`
+            : `${filteredShared.length} shared clip${filteredShared.length === 1 ? "" : "s"}`}
         </p>
+      </div>
+
+      <div className="mb-6 flex gap-2">
+        {LIBRARY_TABS.map((tab) => (
+          <button
+            key={tab.value}
+            type="button"
+            onClick={() => setActiveTab(tab.value)}
+            className={clsx(
+              "h-10 px-4 rounded-xl text-sm font-medium transition-colors",
+              activeTab === tab.value
+                ? "bg-primary text-white"
+                : "border border-line text-main hover:bg-hover"
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       <div className="mb-6 flex flex-col md:flex-row gap-3">
@@ -340,100 +555,38 @@ export default function Library() {
         </div>
       </div>
 
-      {filtered.length === 0 ? (
+      {activeItems.length === 0 ? (
         <div className="rounded-2xl border border-line bg-surface/40 px-6 py-12 text-center">
-          <p className="text-main font-medium">No matches</p>
+          <p className="text-main font-medium">
+            {activeTab === "saved" ? "No saved clips" : "Nothing shared with you yet"}
+          </p>
           <p className="text-sm text-muted mt-1">
-            Try a different search or clear your filters.
+            {activeTab === "saved"
+              ? "Try a different search or clear your filters."
+              : "When someone shares a clip with you, it will show up here."}
           </p>
         </div>
       ) : (
         <ul className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((clip) => {
-            const busy = downloadingId === clip.id;
-            const removing = deletingId === clip.id;
-            return (
-              <li
-                key={clip.id}
-                className="rounded-2xl border border-line bg-surface/60 overflow-hidden flex flex-col"
-              >
-                <div className="relative bg-hover aspect-video center lg:max-h-[200px] max-h-[100px]">
-                  {clip.thumbnail ? (
-                    <img
-                      src={proxiedImageUrl(clip.thumbnail)}
-                      alt={clip.title || "Saved clip"}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <Icon
-                      icon={Bookmark02Icon}
-                      size={28}
-                      className="text-muted"
-                    />
-                  )}
-                </div>
-
-                <div className="p-2 lg:p-4 flex flex-col gap-3 mt-auto">
-                  <div className="min-w-0">
-                    <p className="text-xs uppercase tracking-wide text-primary font-medium">
-                      {platformLabels[clip.platform] || clip.platform}
-                    </p>
-                    <h2 className="text-[15px] font-medium text-main truncate mt-0.5">
-                      {clip.title || "Untitled"}
-                    </h2>
-                    {clip.author && (
-                      <p className="text-sm text-muted truncate">{clip.author}</p>
-                    )}
-                    <p className="text-xs text-muted mt-1">
-                      {formatSavedDate(clip.createdAt)}
-                    </p>
-                  </div>
-
-                  <div className="flex gap-2 flex-col md:flex-row">
-                    <button
-                      type="button"
-                      onClick={() => void handleDownload(clip)}
-                      disabled={busy || downloadingId !== null || removing}
-                      className="btn btn-primary h-10 min-h-8 lg:min-h-10 flex-1 rounded-md text-sm gap-1.5"
-                    >
-                      {busy ? (
-                        <Loader className="animate-spin" size={16} />
-                      ) : (
-                        <Icon icon={Download01Icon} size={16} />
-                      )}
-                      {busy ? "Downloading..." : "Download"}
-                    </button>
-                    <div className="flex gap-2">
-                      <a
-                        href={clip.sourceUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="Open original"
-                        className="btn h-8 lg:h-10 min-h-8 lg:min-h-10 lg:w-10 w-full rounded-md border border-line text-main hover:bg-hover"
-                      >
-                        <Icon icon={Link01Icon} size={16} />{" "}
-                      
-                      </a>
-                      <button
-                        type="button"
-                        title="Delete"
-                        onClick={() => setDeleteTarget(clip)}
-                        disabled={removing || busy}
-                        className="btn h-8 lg:h-10 min-h-8 lg:min-h-10 lg:w-10 w-full rounded-md border border-line text-main hover:bg-hover hover:text-red-500"
-                      >
-                        {removing ? (
-                          <Loader className="animate-spin" size={16} />
-                        ) : (
-                          <Icon icon={Delete02Icon} size={16} />
-                        )}
-                      
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </li>
-            );
-          })}
+          {activeTab === "saved"
+            ? filteredSaved.map((clip) =>
+                renderClipCard(clip, {
+                  key: clip.id,
+                  busy: downloadingId === clip.id,
+                  removing: deletingId === clip.id,
+                  onDelete: () => setDeleteTarget(clip),
+                  onShare: () => setShareTarget(clip),
+                })
+              )
+            : filteredShared.map(({ shareId, clip, sharedBy, sharedAt }) =>
+                renderClipCard(clip, {
+                  key: shareId,
+                  busy: downloadingId === clip.id,
+                  removing: removingShareId === shareId,
+                  meta: `From @${sharedBy.username} · ${formatSavedDate(sharedAt)}`,
+                  onRemoveShare: () => void handleRemoveShare(shareId),
+                })
+              )}
         </ul>
       )}
 
@@ -465,6 +618,27 @@ export default function Library() {
             </button>
           </div>
         </Modal>
+      )}
+
+      {shareTarget && (
+        <ShareClipModal
+          isOpen
+          onClose={() => setShareTarget(null)}
+          clipId={shareTarget.id}
+          clipTitle={shareTarget.title}
+        />
+      )}
+
+      {watchTarget && (
+        <WatchModal
+          isOpen
+          onClose={() => setWatchTarget(null)}
+          title={watchTarget.title}
+          author={watchTarget.author}
+          poster={watchTarget.thumbnail}
+          platform={watchTarget.platform}
+          loadSrc={() => getClipStreamSrc(watchTarget.id)}
+        />
       )}
     </div>
   );

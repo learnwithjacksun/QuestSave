@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader } from "lucide-react";
 import { toast } from "sonner";
-import { FloatingPlatforms, LinkInput, QuickActions } from "@/components/main";
+import { FloatingPlatforms, LinkInput, QuickActions, WatchModal } from "@/components/main";
 import ClipPreviewCard, { type SelectedSlideInfo } from "@/components/main/clip-preview";
 import SaveClipModal from "@/components/main/save-clip-modal";
-import { downloadClipFile, resolveClip, saveClip } from "@/config/clipApi";
+import { downloadClipFile, getPreviewStreamSrc, resolveClip, saveClip } from "@/config/clipApi";
 import { getApiError } from "@/config/api";
 import useAuthStore from "@/store/useAuthStore";
 import type { ClipFormat, ClipPreview } from "@/types/clip";
@@ -28,6 +28,7 @@ export default function Home() {
   const [formatId, setFormatId] = useState("");
   const [slideInfo, setSlideInfo] = useState<SelectedSlideInfo | null>(null);
   const [saveOpen, setSaveOpen] = useState(false);
+  const [watchOpen, setWatchOpen] = useState(false);
   const [inputReset, setInputReset] = useState(0);
   const savingRef = useRef(false);
   const pendingKindRef = useRef<"save-download" | "save">("save-download");
@@ -190,6 +191,7 @@ export default function Home() {
               onFormatChange={setFormatId}
               onSlideChange={setSlideInfo}
               onDownload={() => setSaveOpen(true)}
+              onWatch={() => setWatchOpen(true)}
             />
             <button
               type="button"
@@ -218,6 +220,18 @@ export default function Home() {
         savingOnly={modalAction === "save"}
         downloading={modalAction === "download"}
       />
+
+      {preview && activeFormatId && (
+        <WatchModal
+          isOpen={watchOpen}
+          onClose={() => setWatchOpen(false)}
+          title={preview.title}
+          author={preview.author}
+          poster={slideInfo?.thumbnail || preview.thumbnail}
+          platform={preview.platform}
+          loadSrc={() => getPreviewStreamSrc(preview.sourceUrl, activeFormatId)}
+        />
+      )}
     </div>
   );
 }

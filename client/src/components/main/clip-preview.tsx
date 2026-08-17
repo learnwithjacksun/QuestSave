@@ -35,6 +35,7 @@ interface ClipPreviewCardProps {
   onFormatChange: (id: string) => void;
   onSlideChange?: (info: SelectedSlideInfo) => void;
   onDownload: () => void;
+  onWatch?: () => void;
 }
 
 function formatOptionLabel(fmt: ClipFormat) {
@@ -59,6 +60,7 @@ export default function ClipPreviewCard({
   onFormatChange,
   onSlideChange,
   onDownload,
+  onWatch,
 }: ClipPreviewCardProps) {
   const [slide, setSlide] = useState(0);
   const [imageStatus, setImageStatus] = useState<"loading" | "loaded" | "error">(
@@ -142,6 +144,10 @@ export default function ClipPreviewCard({
     const type = (selectedFormat?.qualityLabel || selectedFormat?.ext || "file").toUpperCase();
     return `Download ${type}`;
   })();
+
+  const showWatch =
+    Boolean(onWatch) &&
+    (selectedKind === "video" || preview.mediaType === "video" || preview.mediaType === "mixed");
 
   return (
     <div className="w-full max-w-3xl mx-auto mt-8 rounded-2xl border border-line bg-surface/60 overflow-hidden text-left">
@@ -231,14 +237,25 @@ export default function ClipPreviewCard({
           />
         )}
 
-        <button
-          type="button"
-          onClick={onDownload}
-          disabled={!activeDownloadId}
-          className="btn btn-primary h-11 w-full rounded-xl gap-2"
-        >
-          {downloadLabel}
-        </button>
+        <div className="flex flex-col sm:flex-row gap-2">
+          {showWatch && (
+            <button
+              type="button"
+              onClick={onWatch}
+              className="btn h-11 flex-1 rounded-xl border border-line text-main hover:bg-hover"
+            >
+              Watch
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onDownload}
+            disabled={!activeDownloadId}
+            className="btn btn-primary h-11 flex-1 rounded-xl gap-2"
+          >
+            {downloadLabel}
+          </button>
+        </div>
       </div>
     </div>
   );

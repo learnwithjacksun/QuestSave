@@ -19,6 +19,7 @@ const clipSchema = new mongoose.Schema(
       enum: ["video", "image", "audio", "mixed"],
       default: "video",
     },
+    playUrl: { type: String, default: "" },
   },
   { timestamps: true }
 );

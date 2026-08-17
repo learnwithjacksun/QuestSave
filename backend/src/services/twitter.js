@@ -405,6 +405,21 @@ export function isTwitterFormat(formatId) {
   return String(formatId || "").startsWith("x:");
 }
 
+export async function resolveTwitterPlayUrl(url, formatId) {
+  let cached = getCache(url);
+  if (!cached?.urls?.[formatId]) {
+    await resolveTwitter(url);
+    cached = getCache(url);
+  }
+
+  const mediaUrl = cached?.urls?.[formatId];
+  if (!mediaUrl) {
+    throw new AppError("Could not resolve a playable URL for this X post.", 422);
+  }
+
+  return mediaUrl;
+}
+
 export async function downloadTwitter(url, formatId) {
   let cached = getCache(url);
   if (!cached?.urls?.[formatId]) {

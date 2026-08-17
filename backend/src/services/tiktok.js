@@ -415,10 +415,6 @@ async function proxyCdn(mediaUrl, formatId, cookies = "") {
   };
 }
 
-export function isTikTokFormat(formatId) {
-  return formatId.startsWith("tt:") || formatId.startsWith("tikwm:");
-}
-
 export async function downloadTikTok(url, formatId) {
   let cached = getCache(url);
   if (!pickCachedMedia(cached, formatId)) {
@@ -455,4 +451,28 @@ export async function downloadTikTok(url, formatId) {
       throw new AppError("Could not download this TikTok. Try another format.", 502);
     }
   }
+}
+
+export function isTikTokFormat(formatId) {
+  return formatId.startsWith("tt:") || formatId.startsWith("tikwm:");
+}
+
+export async function resolveTikTokPlayUrl(url, formatId) {
+  let cached = getCache(url);
+  if (!pickCachedMedia(cached, formatId)) {
+    await resolveTikTok(url);
+    cached = getCache(url);
+  }
+
+  let picked = pickCachedMedia(cached, formatId);
+  if (!picked && formatId.startsWith("tt:")) {
+    await resolveTikWm(url);
+    picked = pickCachedMedia(getCache(url), formatId);
+  }
+
+  if (!picked?.mediaUrl) {
+    throw new AppError("Could not resolve a playable URL for this TikTok.", 422);
+  }
+
+  return picked.mediaUrl;
 }

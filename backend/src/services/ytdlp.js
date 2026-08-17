@@ -493,6 +493,38 @@ export async function resolveMedia(url, platform) {
   };
 }
 
+export async function resolveYtdlpPlayUrl(url, formatId) {
+  if (!FORMAT_ID_SAFE.test(formatId) || formatId.length > 80) {
+    throw new AppError("Invalid format", 400);
+  }
+
+  const itemMatch = /^item:(\d+)$/.exec(formatId);
+  const ytdlpFormat = itemMatch ? "best" : formatId === "best" ? "best" : formatId;
+  const args = [
+    "-g",
+    "-f",
+    ytdlpFormat,
+    "--no-playlist",
+    ...commonArgs(),
+    url,
+  ];
+
+  if (itemMatch) {
+    args.splice(1, 0, "--playlist-items", String(Number(itemMatch[1]) + 1), "--yes-playlist");
+    args.splice(args.indexOf("--no-playlist"), 1);
+  }
+
+  const { stdout } = await runYtdlp(args, { timeoutMs: Math.max(env.ytdlp.timeoutMs, 180_000) });
+  const line = stdout
+    .split("\n")
+    .map((value) => value.trim())
+    .find((value) => value.startsWith("http"));
+  if (!line) {
+    throw new AppError("Could not resolve a playable URL for this link.", 422);
+  }
+  return line;
+}
+
 export async function downloadMedia(url, formatId) {
   if (!FORMAT_ID_SAFE.test(formatId) || formatId.length > 80) {
     throw new AppError("Invalid format", 400);
