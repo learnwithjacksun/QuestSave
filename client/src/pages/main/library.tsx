@@ -75,7 +75,7 @@ function matchesDate(iso: string, filter: DateFilter) {
   return true;
 }
 
-export default function Saves() {
+export default function Library() {
   const { user, hydrated, openOverlay } = useAuthStore();
   const [searchParams, setSearchParams] = useSearchParams();
   const focusId = searchParams.get("id");
@@ -118,7 +118,7 @@ export default function Saves() {
       .catch((err) => {
         if (mounted) {
           setClips([]);
-          toast.error(getApiError(err, "Could not load your saves"));
+          toast.error(getApiError(err, "Could not load your library"));
         }
       })
       .finally(() => {
@@ -179,7 +179,7 @@ export default function Saves() {
     setDeleteTarget(null);
     try {
       await deleteClip(id);
-      toast.success("Removed from saves");
+      toast.success("Removed from library");
     } catch (err) {
       setClips(previous);
       toast.error(getApiError(err, "Could not delete clip"));
@@ -205,10 +205,10 @@ export default function Saves() {
             <Icon icon={Bookmark02Icon} size={32} className="text-muted" />
           </div>
           <h1 className="text-2xl md:text-3xl font-medium text-main mb-3">
-            Your Saves
+            Your Library
           </h1>
           <p className="text-muted text-sm leading-relaxed mb-6">
-            Sign in to see clips you have saved to your library.
+            Sign in to access clips you have saved.
           </p>
           <button
             type="button"
@@ -226,7 +226,7 @@ export default function Saves() {
     return (
       <div className="flex flex-col items-center justify-center min-h-full px-4 pb-16">
         <Loader className="animate-spin text-primary" size={28} />
-        <p className="text-sm text-muted mt-3">Loading your saves...</p>
+        <p className="text-sm text-muted mt-3">Loading your library...</p>
       </div>
     );
   }
@@ -239,10 +239,10 @@ export default function Saves() {
             <Icon icon={Bookmark02Icon} size={32} className="text-muted" />
           </div>
           <h1 className="text-2xl md:text-3xl font-medium text-main mb-3">
-            No saves yet
+            Your library is empty
           </h1>
           <p className="text-muted text-sm leading-relaxed mb-6">
-            Paste a link on Clip Save and choose Save and download to keep it
+            Paste a link on Save Clip and choose Save and download to add it
             here.
           </p>
           <Link to="/" className="btn btn-primary h-11 px-6 rounded-xl mx-auto">
@@ -257,13 +257,13 @@ export default function Saves() {
     <div className="w-full max-w-5xl mx-auto px-4 pb-16">
       <div className="mb-6">
         <h1 className="text-2xl md:text-3xl font-medium text-main">
-          Your Saves
+          Your Library
         </h1>
         <p className="text-sm text-muted mt-1">
           {focusId
             ? filtered.length
-              ? "Showing 1 save from Recent"
-              : "That save was not found"
+              ? "Showing 1 clip from Recent"
+              : "That clip was not found"
             : `${filtered.length} of ${clips.length} clip${clips.length === 1 ? "" : "s"}`}
           {focusId ? (
             <>
@@ -441,7 +441,7 @@ export default function Saves() {
         <Modal
           isOpen
           onClose={() => setDeleteTarget(null)}
-          title="Delete save?"
+          title="Remove from library?"
         >
           <p className="text-sm text-muted mb-4">
             Remove “{deleteTarget.title || "Untitled"}” from your library? This

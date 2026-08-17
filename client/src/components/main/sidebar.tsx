@@ -100,7 +100,7 @@ export default function Sidebar() {
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search saves"
+              placeholder="Search library"
               className="w-full rounded-lg focus:bg-hover pl-9 pr-9 py-2.5 text-sm text-main placeholder:text-muted ring-1 ring-line focus:ring-1 focus:ring-primary"
             />
             {query && (
@@ -145,22 +145,22 @@ export default function Sidebar() {
         {(filteredRecents.length > 0 || !normalizedQuery) && (
         <div className="flex-1 overflow-hidden flex flex-col mt-4 px-3 min-h-0">
           <NavLink
-            to="/saves"
+            to="/library"
             onClick={() => window.innerWidth < 768 && setOpen(false)}
             className="px-3 py-1.5 text-xs text-muted font-medium hover:text-main transition-colors"
           >
-            {normalizedQuery ? "Results" : "Recent Saves"}
+            {normalizedQuery ? "Results" : "Recent"}
           </NavLink>
 
           {user ? (
             <ul className="flex-1 overflow-y-auto hide-scrollbar space-y-0.5">
               {filteredRecents.length === 0 && !normalizedQuery && (
-                <li className="px-3 py-2 text-sm text-muted">No saves yet</li>
+                <li className="px-3 py-2 text-sm text-muted">Nothing in your library yet</li>
               )}
               {filteredRecents.map((clip) => (
                 <li key={clip.id}>
                   <NavLink
-                    to={`/saves?id=${encodeURIComponent(clip.id)}`}
+                    to={`/library?id=${encodeURIComponent(clip.id)}`}
                     onClick={() => window.innerWidth < 768 && setOpen(false)}
                     className="block w-full text-left px-3 py-2 rounded-lg text-xs md:text-sm text-main hover:bg-hover transition-colors truncate"
                   >
@@ -175,7 +175,7 @@ export default function Sidebar() {
               onClick={openOverlay}
               className="mt-1 text-left px-3 py-2 rounded-lg text-sm text-muted hover:text-main hover:bg-hover transition-colors"
             >
-              Sign in to see your saves
+              Sign in to see your library
             </button>
           )}
         </div>
