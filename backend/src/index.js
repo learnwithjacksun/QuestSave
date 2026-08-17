@@ -13,19 +13,9 @@ import shareRoutes from "./routes/share.routes.js";
 const app = express();
 app.set("trust proxy", 1);
 
-const allowedOrigins = [
-  ...new Set(
-    [
-      env.clientOrigin,
-      "https://questsave.orzn.app",
-      "http://localhost:3000",
-    ].filter(Boolean),
-  ),
-];
-
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin: ["https://questsave.orzn.app","http://localhost:3000"]
     credentials: true,
     exposedHeaders: ["Content-Disposition", "Content-Range", "Accept-Ranges", "Content-Length"],
   }),
