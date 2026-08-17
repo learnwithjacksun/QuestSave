@@ -10,7 +10,7 @@ import {
   isRapidApiPlatform,
   resolveSocialMedia,
 } from "../services/rapidApi/socialMediaDownloader.js";
-import { downloadMedia, resolveMedia, ytdlpFallbackFormat } from "../services/ytdlp.js";
+import { downloadMedia, resolveMedia } from "../services/ytdlp.js";
 import { resolvePlayUrl } from "../services/playUrl.js";
 import { proxyCdnUrl, refererForPlatform, requestRange } from "../services/cdnProxy.js";
 import { AppError } from "../utils/AppError.js";
@@ -49,23 +49,7 @@ async function fetchMediaFile(sourceUrl, formatId, { range } = {}) {
     return downloadTwitter(url, id, options);
   }
   if (isRapidApiPlatform(platform)) {
-    const useYtdlpFormat =
-      (platform === "youtube" || platform === "instagram") && !id.startsWith("rap:");
-    if (useYtdlpFormat) {
-      return downloadMedia(url, ytdlpFallbackFormat(id), options);
-    }
-    try {
-      return await downloadSocialMedia(url, id, platform, options);
-    } catch (err) {
-      if (platform === "youtube" || platform === "instagram") {
-        try {
-          return await downloadMedia(url, ytdlpFallbackFormat(id), options);
-        } catch (fallbackErr) {
-          if (fallbackErr instanceof AppError) throw fallbackErr;
-        }
-      }
-      throw err;
-    }
+    return downloadSocialMedia(url, id, platform, options);
   }
   return downloadMedia(url, id, options);
 }
@@ -166,24 +150,14 @@ export const resolveClip = asyncHandler(async (req, res) => {
     return;
   }
 
-  let preview;
-  if (platform === "tiktok") {
-    preview = await resolveTikTok(url);
-  } else if (platform === "twitter") {
-    preview = await resolveTwitter(url);
-  } else if (isRapidApiPlatform(platform)) {
-    try {
-      preview = await resolveSocialMedia(url, platform);
-    } catch (err) {
-      if (platform === "youtube" || platform === "instagram") {
-        preview = await resolveMedia(url, platform);
-      } else {
-        throw err;
-      }
-    }
-  } else {
-    preview = await resolveMedia(url, platform);
-  }
+  const preview =
+    platform === "tiktok"
+      ? await resolveTikTok(url)
+      : platform === "twitter"
+        ? await resolveTwitter(url)
+        : isRapidApiPlatform(platform)
+          ? await resolveSocialMedia(url, platform)
+          : await resolveMedia(url, platform);
   setResolved(url, preview);
   res.json(preview);
 });

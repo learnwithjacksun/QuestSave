@@ -526,20 +526,6 @@ export async function resolveYtdlpPlayUrl(url, formatId) {
   return line;
 }
 
-export function ytdlpFallbackFormat(formatId) {
-  const id = String(formatId || "");
-  if (
-    !id ||
-    id.startsWith("rap:") ||
-    id.startsWith("tt:") ||
-    id.startsWith("tikwm:") ||
-    id.startsWith("x:")
-  ) {
-    return "bv*+ba/b";
-  }
-  return id;
-}
-
 export async function downloadMedia(url, formatId, { range } = {}) {
   if (!FORMAT_ID_SAFE.test(formatId) || formatId.length > 80) {
     throw new AppError("Invalid format", 400);

@@ -182,14 +182,12 @@ function mediaKindFromType(type) {
 }
 
 function youtubeCombined(item) {
-  const mime = String(item?.mimeType || item?.mime_type || "").toLowerCase();
   const itag = Number(item?.itag || 0);
   if ([18, 22].includes(itag)) return true;
+  const mime = String(item?.mimeType || item?.mime_type || "").toLowerCase();
   const hasVideo = /video\/|avc1|av01|mp4v|h264/.test(mime);
-  const hasAudio = /mp4a|opus|vorbis|audio\//.test(mime);
-  if (hasVideo && hasAudio) return true;
-  if (item?.audioQuality && (item?.width || item?.height || item?.qualityLabel)) return true;
-  return false;
+  const hasAudio = /mp4a|opus|vorbis/.test(mime);
+  return hasVideo && hasAudio;
 }
 
 function mapAxiosError(err) {
@@ -417,10 +415,27 @@ function previewFromItems({ platform, sourceUrl, title, author, thumbnail, stats
   };
 }
 
+function collectYouTubeFormatItems(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value !== "object") return [];
+  return Object.entries(value).map(([key, item]) => {
+    if (typeof item === "string") {
+      const height = Number.parseInt(String(key), 10) || 0;
+      return { url: item, qualityLabel: key, height };
+    }
+    return item;
+  });
+}
+
 function normalizeYouTube(data, sourceUrl) {
-  const combined = [...asArray(data?.formats), ...asArray(data?.adaptiveFormats)].filter(
+  const progressive = collectYouTubeFormatItems(data?.formats).filter(
     (item) => mediaUrlFromItem(item) && youtubeCombined(item)
   );
+  const adaptiveMuxed = collectYouTubeFormatItems(data?.adaptiveFormats).filter(
+    (item) => mediaUrlFromItem(item) && youtubeCombined(item)
+  );
+  const combined = progressive.length ? progressive : adaptiveMuxed;
   const items = combined.map((item) => ({
     kind: "video",
     url: mediaUrlFromItem(item),
@@ -568,17 +583,29 @@ function contentTypeFor(entry) {
 }
 
 async function proxyCdn(mediaUrl, entry, range) {
-  const file = await proxyCdnUrl(mediaUrl, {
-    referer: entry.referer || refererFor("youtube"),
+  const options = {
     range,
     filename: filenameFor(entry),
     contentType: contentTypeFor(entry),
-  });
-  return {
-    ...file,
-    filename: filenameFor({ ...entry, mimeType: file.contentType }),
-    contentType: file.contentType || contentTypeFor(entry),
   };
+  const referer = entry.referer || refererFor("youtube");
+
+  try {
+    const file = await proxyCdnUrl(mediaUrl, { ...options, referer });
+    return {
+      ...file,
+      filename: filenameFor({ ...entry, mimeType: file.contentType }),
+      contentType: file.contentType || contentTypeFor(entry),
+    };
+  } catch (err) {
+    if (!(err instanceof AppError) || err.statusCode !== 403) throw err;
+    const file = await proxyCdnUrl(mediaUrl, options);
+    return {
+      ...file,
+      filename: filenameFor({ ...entry, mimeType: file.contentType }),
+      contentType: file.contentType || contentTypeFor(entry),
+    };
+  }
 }
 
 function pickMedia(cached, formatId) {
@@ -604,6 +631,18 @@ export async function resolveSocialMediaPlayUrl(url, formatId, platform) {
   return entry.videoUrl;
 }
 
+function videoEntries(cached) {
+  if (!cached?.media) return [];
+  const seen = new Set();
+  const list = [];
+  for (const item of Object.values(cached.media)) {
+    if (item?.mediaKind !== "video" || !item?.videoUrl || seen.has(item.videoUrl)) continue;
+    seen.add(item.videoUrl);
+    list.push(item);
+  }
+  return list;
+}
+
 export async function downloadSocialMedia(url, formatId, platform, { range } = {}) {
   let cached = getCache(url, platform);
   if (!cached?.media?.[formatId] && !cached?.media?.["rap:best"]) {
@@ -611,26 +650,42 @@ export async function downloadSocialMedia(url, formatId, platform, { range } = {
     cached = getCache(url, platform);
   }
 
-  let entry = pickMedia(cached, formatId);
-  if (!entry?.videoUrl) {
+  const selected = pickMedia(cached, formatId);
+  if (!selected?.videoUrl) {
     throw new AppError("Could not resolve a downloadable file for this post.", 422);
   }
 
-  const run = async (selected) => proxyCdn(selected.videoUrl, selected, range);
+  const queue = [selected, ...videoEntries(cached).filter((item) => item.videoUrl !== selected.videoUrl)];
+
+  const runQueue = async (entries) => {
+    let lastErr;
+    for (const entry of entries) {
+      try {
+        return await proxyCdn(entry.videoUrl, entry, range);
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+    throw lastErr || new AppError("Could not download this file. Try another quality.", 502);
+  };
 
   try {
-    return await run(entry);
+    return await runQueue(queue);
   } catch (err) {
     if (err instanceof AppError && err.statusCode === 503) throw err;
     mediaCache.delete(cacheKey(url, platform));
     try {
       await resolveSocialMedia(url, platform);
       cached = getCache(url, platform);
-      entry = pickMedia(cached, formatId);
-      if (!entry?.videoUrl) {
+      const refreshed = pickMedia(cached, formatId);
+      if (!refreshed?.videoUrl) {
         throw new AppError("Could not refresh the download link.", 502);
       }
-      return await run(entry);
+      const retryQueue = [
+        refreshed,
+        ...videoEntries(cached).filter((item) => item.videoUrl !== refreshed.videoUrl),
+      ];
+      return await runQueue(retryQueue);
     } catch (retryErr) {
       if (retryErr instanceof AppError) throw retryErr;
       throw new AppError("Could not download this file. Try another quality.", 502);
