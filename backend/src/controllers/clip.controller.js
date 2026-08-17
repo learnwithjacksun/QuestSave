@@ -1,4 +1,5 @@
 import { z } from "zod";
+import axios from "axios";
 import Clip from "../models/Clip.js";
 import Share from "../models/Share.js";
 import { detectPlatform, sanitizeFormatId } from "../services/platform.js";
@@ -67,6 +68,51 @@ function pipeInlineStream(res, file, { filename = "questsave-clip" } = {}) {
     file.cleanup();
   });
   file.stream.pipe(res);
+}
+
+const STREAM_USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
+async function proxyPlayUrl(playUrl) {
+  const response = await axios.get(playUrl, {
+    responseType: "stream",
+    maxRedirects: 5,
+    timeout: 180_000,
+    headers: {
+      "User-Agent": STREAM_USER_AGENT,
+      Accept: "*/*",
+    },
+    validateStatus: (status) => status >= 200 && status < 400,
+  });
+
+  const contentType = response.headers["content-type"] || "video/mp4";
+  const size = Number(response.headers["content-length"]) || 0;
+
+  return {
+    stream: response.data,
+    contentType,
+    size,
+    cleanup: () => {
+      response.data.destroy?.();
+    },
+  };
+}
+
+async function streamClipMedia(clip) {
+  if (clip.playUrl?.startsWith("http")) {
+    try {
+      return await proxyPlayUrl(clip.playUrl);
+    } catch {
+      // fall through to resolve/download pipeline
+    }
+  }
+
+  const formatId = clip.formatId || "";
+  if (!formatId) {
+    throw new AppError("This clip has no playable format saved", 422);
+  }
+
+  return fetchMediaFile(clip.sourceUrl, formatId);
 }
 
 async function ensureClipAccess(clipId, userId) {
@@ -197,12 +243,7 @@ export const streamClip = asyncHandler(async (req, res) => {
   }
 
   const clip = await ensureClipAccess(req.params.id, payload.userId);
-  const formatId = clip.formatId || "";
-  if (!formatId) {
-    throw new AppError("This clip has no playable format saved", 422);
-  }
-
-  const file = await fetchMediaFile(clip.sourceUrl, formatId);
+  const file = await streamClipMedia(clip);
   pipeInlineStream(res, file, { filename: clip.title || "questsave-clip" });
 });
 
