@@ -5,7 +5,7 @@ import {
   isRapidApiPlatform,
   resolveSocialMediaPlayUrl,
 } from "./rapidApi/socialMediaDownloader.js";
-import { resolveYtdlpPlayUrl, ytdlpFallbackFormat } from "./ytdlp.js";
+import { resolveYtdlpPlayUrl } from "./ytdlp.js";
 
 export async function resolvePlayUrl(sourceUrl, formatId) {
   const { platform, url } = detectPlatform(sourceUrl);
@@ -19,17 +19,7 @@ export async function resolvePlayUrl(sourceUrl, formatId) {
     return resolveTwitterPlayUrl(url, id);
   }
   if (isRapidApiPlatform(platform)) {
-    if ((platform === "youtube" || platform === "instagram") && !id.startsWith("rap:")) {
-      return resolveYtdlpPlayUrl(url, ytdlpFallbackFormat(id));
-    }
-    try {
-      return await resolveSocialMediaPlayUrl(url, id, platform);
-    } catch (err) {
-      if (platform === "youtube" || platform === "instagram") {
-        return resolveYtdlpPlayUrl(url, ytdlpFallbackFormat(id));
-      }
-      throw err;
-    }
+    return resolveSocialMediaPlayUrl(url, id, platform);
   }
   return resolveYtdlpPlayUrl(url, id);
 }
