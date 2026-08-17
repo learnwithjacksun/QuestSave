@@ -242,7 +242,7 @@ export default function ClipPreviewCard({
             <button
               type="button"
               onClick={onWatch}
-              className="btn h-11 flex-1 rounded-xl border border-line text-main hover:bg-hover"
+              className="btn min-h-11 flex-1 rounded-xl border border-line text-main hover:bg-hover"
             >
               Watch
             </button>
@@ -251,7 +251,7 @@ export default function ClipPreviewCard({
             type="button"
             onClick={onDownload}
             disabled={!activeDownloadId}
-            className="btn btn-primary h-11 flex-1 rounded-xl gap-2"
+            className="btn btn-primary min-h-11 flex-1 rounded-xl gap-2"
           >
             {downloadLabel}
           </button>
