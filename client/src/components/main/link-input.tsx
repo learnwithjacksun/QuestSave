@@ -15,7 +15,7 @@ interface LinkInputProps {
 
 export default function LinkInput({
   onSubmit,
-  placeholder = "Paste a social media link to save...",
+  placeholder = "Paste media link...",
   className,
   loading = false,
   resetNonce = 0,
