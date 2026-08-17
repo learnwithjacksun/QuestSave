@@ -1,5 +1,6 @@
 import axios from "axios";
 import { createReadStream } from "fs";
+import env from "../config/env.js";
 import { AppError } from "../utils/AppError.js";
 
 export const CDN_USER_AGENT =
@@ -72,19 +73,35 @@ export function applyFileRange(file, filePath, rangeHeader) {
 }
 
 export async function proxyCdnUrl(mediaUrl, options = {}) {
-  const { referer, cookies, range, filename, contentType } = options;
+  const { referer, cookies, range, filename, contentType, sendOrigin = false } = options;
   const headers = {
     "User-Agent": CDN_USER_AGENT,
     Accept: "*/*",
+    "Accept-Language": "en-US,en;q=0.9",
   };
 
   if (referer) {
     headers.Referer = referer;
-    const origin = originForReferer(referer);
-    if (origin) headers.Origin = origin;
+    if (sendOrigin) {
+      const origin = originForReferer(referer);
+      if (origin) headers.Origin = origin;
+    }
   }
   if (cookies) headers.Cookie = cookies;
   if (range) headers.Range = range;
+
+  try {
+    const parsed = new URL(mediaUrl);
+    const host = parsed.hostname.toLowerCase();
+    if (host.includes("rapidapi.com") || host.includes("rapidapi.io")) {
+      if (env.rapidApi.key) {
+        headers["x-rapidapi-key"] = env.rapidApi.key;
+        headers["x-rapidapi-host"] = host;
+      }
+    }
+  } catch {
+    // ignore invalid URLs; axios will fail below
+  }
 
   try {
     const response = await axios.get(mediaUrl, {

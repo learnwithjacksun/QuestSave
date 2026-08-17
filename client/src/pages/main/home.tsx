@@ -116,13 +116,19 @@ export default function Home() {
     if (!preview || !activeFormatId) return;
     setModalAction("save-download");
     try {
-      await Promise.all([
-        persistClip(),
-        downloadClipFile(preview.sourceUrl, activeFormatId, preview.title),
-      ]);
-      toast.success("Saved to your library");
+      await downloadClipFile(preview.sourceUrl, activeFormatId, preview.title);
+      try {
+        await persistClip();
+        toast.success("Saved to your library");
+      } catch (err) {
+        toast.error(
+          err instanceof Error
+            ? err.message
+            : getApiError(err, "Downloaded, but could not save to your library")
+        );
+      }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : getApiError(err, "Could not save clip"));
+      toast.error(err instanceof Error ? err.message : getApiError(err, "Download failed"));
     } finally {
       setModalAction(null);
       setSaveOpen(false);
