@@ -7,7 +7,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import Icon from "./icon";
 import VideoPlayer from "./video-player";
-import { getClipStreamSrc, getPreviewStreamSrc } from "@/config/clipApi";
+import { getClipPlayback, getPreviewPlayback } from "@/config/clipApi";
 import { getApiError } from "@/config/api";
 import { proxiedImageUrl } from "@/helpers/proxiedImageUrl";
 import type { FeedClip } from "@/types/clip";
@@ -35,6 +35,7 @@ export default function FeedSlide({
   onDownload,
 }: FeedSlideProps) {
   const [src, setSrc] = useState("");
+  const [mimeType, setMimeType] = useState("video/mp4");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const isImage = clip.mediaType === "image";
@@ -44,20 +45,30 @@ export default function FeedSlide({
     if (!active || isImage) return;
 
     let mounted = true;
+    let revoke = () => {};
     setLoading(true);
     setError("");
+    setSrc("");
 
     const load =
       clip.origin === "preview" && clip.formatId
-        ? getPreviewStreamSrc(clip.sourceUrl, clip.formatId)
-        : getClipStreamSrc(clip.id);
+        ? getPreviewPlayback(clip.sourceUrl, clip.formatId)
+        : getClipPlayback(clip.id);
 
     load
-      .then((streamSrc) => {
-        if (mounted) setSrc(streamSrc);
+      .then((playback) => {
+        if (!mounted) {
+          playback.revoke();
+          return;
+        }
+        revoke = playback.revoke;
+        setMimeType(playback.type);
+        setSrc(playback.src);
       })
       .catch((err) => {
-        if (mounted) setError(getApiError(err, "Could not load video"));
+        if (mounted) {
+          setError(err instanceof Error ? err.message : getApiError(err, "Could not load video"));
+        }
       })
       .finally(() => {
         if (mounted) setLoading(false);
@@ -65,6 +76,7 @@ export default function FeedSlide({
 
     return () => {
       mounted = false;
+      revoke();
     };
   }, [active, clip.id, clip.origin, clip.sourceUrl, clip.formatId, isImage]);
 
@@ -98,6 +110,7 @@ export default function FeedSlide({
           poster={poster}
           vertical
           autoplay={active}
+          mimeType={mimeType}
           className="h-full questsave-player-cover"
         />
       ) : poster ? (

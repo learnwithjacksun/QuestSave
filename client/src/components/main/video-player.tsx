@@ -10,10 +10,13 @@ interface VideoPlayerProps {
   poster?: string;
   vertical?: boolean;
   autoplay?: boolean;
+  mimeType?: string;
   className?: string;
 }
 
-function sourceType(src: string) {
+function sourceType(src: string, mimeType?: string) {
+  if (mimeType) return mimeType;
+  if (src.startsWith("blob:")) return "video/mp4";
   const value = src.toLowerCase();
   if (value.includes(".m3u8") || value.includes("mpegurl")) {
     return "application/x-mpegURL";
@@ -28,6 +31,7 @@ export default function VideoPlayer({
   poster,
   vertical = false,
   autoplay = false,
+  mimeType,
   className = "",
 }: VideoPlayerProps) {
   const placeholderRef = useRef<HTMLDivElement | null>(null);
@@ -54,7 +58,7 @@ export default function VideoPlayer({
         pictureInPictureToggle: true,
         remainingTimeDisplay: true,
       },
-      sources: [{ src, type: sourceType(src) }],
+      sources: [{ src, type: sourceType(src, mimeType) }],
     });
 
     playerRef.current = player;
@@ -64,7 +68,7 @@ export default function VideoPlayer({
       playerRef.current = null;
       placeholder.replaceChildren();
     };
-  }, [src, poster, vertical, autoplay]);
+  }, [src, poster, vertical, autoplay, mimeType]);
 
   return (
     <div
