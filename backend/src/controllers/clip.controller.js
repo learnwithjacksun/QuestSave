@@ -1,5 +1,4 @@
 import { z } from "zod";
-import axios from "axios";
 import Clip from "../models/Clip.js";
 import Share from "../models/Share.js";
 import { detectPlatform, sanitizeFormatId } from "../services/platform.js";
@@ -11,8 +10,9 @@ import {
   isRapidApiPlatform,
   resolveSocialMedia,
 } from "../services/rapidApi/socialMediaDownloader.js";
-import { downloadMedia, resolveMedia } from "../services/ytdlp.js";
+import { downloadMedia, resolveMedia, ytdlpFallbackFormat } from "../services/ytdlp.js";
 import { resolvePlayUrl } from "../services/playUrl.js";
+import { proxyCdnUrl, refererForPlatform, requestRange } from "../services/cdnProxy.js";
 import { AppError } from "../utils/AppError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { buildDownloadFilename } from "../utils/downloadFilename.js";
@@ -37,29 +37,52 @@ function serializeClip(clip) {
   };
 }
 
-async function fetchMediaFile(sourceUrl, formatId) {
+async function fetchMediaFile(sourceUrl, formatId, { range } = {}) {
   const { platform, url } = detectPlatform(sourceUrl);
   const id = sanitizeFormatId(formatId);
+  const options = { range };
 
   if (isTikTokFormat(id)) {
-    return downloadTikTok(url, id);
+    return downloadTikTok(url, id, options);
   }
   if (isTwitterFormat(id)) {
-    return downloadTwitter(url, id);
+    return downloadTwitter(url, id, options);
   }
   if (isRapidApiPlatform(platform)) {
-    return downloadSocialMedia(url, id, platform);
+    const useYtdlpFormat =
+      (platform === "youtube" || platform === "instagram") && !id.startsWith("rap:");
+    if (useYtdlpFormat) {
+      return downloadMedia(url, ytdlpFallbackFormat(id), options);
+    }
+    try {
+      return await downloadSocialMedia(url, id, platform, options);
+    } catch (err) {
+      if (platform === "youtube" || platform === "instagram") {
+        try {
+          return await downloadMedia(url, ytdlpFallbackFormat(id), options);
+        } catch (fallbackErr) {
+          if (fallbackErr instanceof AppError) throw fallbackErr;
+        }
+      }
+      throw err;
+    }
   }
-  return downloadMedia(url, id);
+  return downloadMedia(url, id, options);
 }
 
 function pipeInlineStream(res, file, { filename = "questsave-clip" } = {}) {
   res.setHeader("Content-Type", file.contentType);
   res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+  res.setHeader("Accept-Ranges", file.acceptRanges || "bytes");
+  if (file.contentRange) {
+    res.setHeader("Content-Range", file.contentRange);
+  }
   if (file.size) {
     res.setHeader("Content-Length", file.size);
   }
-  res.setHeader("Accept-Ranges", "bytes");
+  if (file.statusCode === 206) {
+    res.status(206);
+  }
 
   file.stream.on("close", () => {
     file.cleanup();
@@ -69,9 +92,6 @@ function pipeInlineStream(res, file, { filename = "questsave-clip" } = {}) {
   });
   file.stream.pipe(res);
 }
-
-const STREAM_USER_AGENT =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
 function isPlayableContentType(contentType) {
   const type = String(contentType || "").toLowerCase();
@@ -83,40 +103,25 @@ function isPlayableContentType(contentType) {
   );
 }
 
-async function proxyPlayUrl(playUrl) {
-  const response = await axios.get(playUrl, {
-    responseType: "stream",
-    maxRedirects: 5,
-    timeout: 180_000,
-    headers: {
-      "User-Agent": STREAM_USER_AGENT,
-      Accept: "*/*",
-    },
-    validateStatus: (status) => status >= 200 && status < 400,
+async function proxyPlayUrl(playUrl, { range, platform } = {}) {
+  const file = await proxyCdnUrl(playUrl, {
+    referer: refererForPlatform(platform),
+    range,
+    contentType: "video/mp4",
   });
 
-  const contentType = response.headers["content-type"] || "video/mp4";
-  if (!isPlayableContentType(contentType)) {
-    response.data.destroy?.();
+  if (!isPlayableContentType(file.contentType)) {
+    file.cleanup();
     throw new Error("Stored play URL is not a media stream");
   }
 
-  const size = Number(response.headers["content-length"]) || 0;
-
-  return {
-    stream: response.data,
-    contentType,
-    size,
-    cleanup: () => {
-      response.data.destroy?.();
-    },
-  };
+  return file;
 }
 
-async function streamClipMedia(clip) {
+async function streamClipMedia(clip, { range } = {}) {
   if (clip.playUrl?.startsWith("http")) {
     try {
-      return await proxyPlayUrl(clip.playUrl);
+      return await proxyPlayUrl(clip.playUrl, { range, platform: clip.platform });
     } catch {
       // fall through to resolve/download pipeline
     }
@@ -127,7 +132,7 @@ async function streamClipMedia(clip) {
     throw new AppError("This clip has no playable format saved", 422);
   }
 
-  return fetchMediaFile(clip.sourceUrl, formatId);
+  return fetchMediaFile(clip.sourceUrl, formatId, { range });
 }
 
 async function ensureClipAccess(clipId, userId) {
@@ -161,14 +166,24 @@ export const resolveClip = asyncHandler(async (req, res) => {
     return;
   }
 
-  const preview =
-    platform === "tiktok"
-      ? await resolveTikTok(url)
-      : platform === "twitter"
-        ? await resolveTwitter(url)
-        : isRapidApiPlatform(platform)
-          ? await resolveSocialMedia(url, platform)
-          : await resolveMedia(url, platform);
+  let preview;
+  if (platform === "tiktok") {
+    preview = await resolveTikTok(url);
+  } else if (platform === "twitter") {
+    preview = await resolveTwitter(url);
+  } else if (isRapidApiPlatform(platform)) {
+    try {
+      preview = await resolveSocialMedia(url, platform);
+    } catch (err) {
+      if (platform === "youtube" || platform === "instagram") {
+        preview = await resolveMedia(url, platform);
+      } else {
+        throw err;
+      }
+    }
+  } else {
+    preview = await resolveMedia(url, platform);
+  }
   setResolved(url, preview);
   res.json(preview);
 });
@@ -229,7 +244,7 @@ export const previewStream = asyncHandler(async (req, res) => {
 
   const { url } = detectPlatform(parsed.data.url);
   const formatId = sanitizeFormatId(parsed.data.formatId);
-  const file = await fetchMediaFile(url, formatId);
+  const file = await fetchMediaFile(url, formatId, { range: requestRange(req) });
   pipeInlineStream(res, file);
 });
 
@@ -255,7 +270,7 @@ export const streamClip = asyncHandler(async (req, res) => {
   }
 
   const clip = await ensureClipAccess(req.params.id, payload.userId);
-  const file = await streamClipMedia(clip);
+  const file = await streamClipMedia(clip, { range: requestRange(req) });
   pipeInlineStream(res, file, { filename: clip.title || "questsave-clip" });
 });
 

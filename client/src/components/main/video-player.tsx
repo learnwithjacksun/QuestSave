@@ -12,6 +12,7 @@ interface VideoPlayerProps {
   autoplay?: boolean;
   mimeType?: string;
   className?: string;
+  onError?: (message: string) => void;
 }
 
 function sourceType(src: string, mimeType?: string) {
@@ -33,9 +34,12 @@ export default function VideoPlayer({
   autoplay = false,
   mimeType,
   className = "",
+  onError,
 }: VideoPlayerProps) {
   const placeholderRef = useRef<HTMLDivElement | null>(null);
   const playerRef = useRef<Player | null>(null);
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
 
   useEffect(() => {
     const placeholder = placeholderRef.current;
@@ -53,12 +57,21 @@ export default function VideoPlayer({
       fluid: !vertical,
       fill: vertical,
       poster,
-      playbackRates: [0.5, 0.75, 1, 1.25, 1.5, 2],
+      playsinline: true,
+      playbackRates: vertical ? [] : [0.5, 0.75, 1, 1.25, 1.5, 2],
+      inactivityTimeout: 2500,
       controlBar: {
-        pictureInPictureToggle: true,
+        pictureInPictureToggle: !vertical,
         remainingTimeDisplay: true,
+        playbackRateMenuButton: !vertical,
+        volumePanel: vertical ? { inline: false } : { inline: true },
       },
       sources: [{ src, type: sourceType(src, mimeType) }],
+    });
+
+    player.on("error", () => {
+      const mediaError = player.error();
+      onErrorRef.current?.(mediaError?.message || "Could not load video");
     });
 
     playerRef.current = player;

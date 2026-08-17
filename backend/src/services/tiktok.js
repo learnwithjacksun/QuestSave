@@ -2,6 +2,7 @@ import axios from "axios";
 import * as cheerio from "cheerio";
 import { AppError } from "../utils/AppError.js";
 import { resolveMedia } from "./ytdlp.js";
+import { proxyCdnUrl } from "./cdnProxy.js";
 
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
@@ -387,35 +388,31 @@ function pickCachedMedia(cached, formatId) {
   return { mediaUrl: fallback[1], resolvedId: fallback[0], cookies: cached.cookies };
 }
 
-async function proxyCdn(mediaUrl, formatId, cookies = "") {
-  const response = await axios.get(mediaUrl, {
-    responseType: "stream",
-    maxRedirects: 5,
-    timeout: 180_000,
-    headers: {
-      "User-Agent": USER_AGENT,
-      Referer: refererFor(formatId),
-      Accept: "*/*",
-      ...(cookies ? { Cookie: cookies } : {}),
-    },
-    validateStatus: (status) => status >= 200 && status < 400,
-  });
-
-  const contentType = response.headers["content-type"] || "application/octet-stream";
-  const size = Number(response.headers["content-length"]) || 0;
-
-  return {
-    stream: response.data,
-    filename: filenameFor(formatId, contentType),
-    contentType,
-    size,
-    cleanup: () => {
-      response.data.destroy?.();
-    },
-  };
+async function proxyCdn(mediaUrl, formatId, cookies = "", range = "") {
+  const contentTypeGuess = formatId.includes(":img:")
+    ? "image/jpeg"
+    : formatId.includes("music")
+      ? "audio/mpeg"
+      : "video/mp4";
+  try {
+    const file = await proxyCdnUrl(mediaUrl, {
+      referer: refererFor(formatId),
+      cookies,
+      range,
+      filename: filenameFor(formatId, contentTypeGuess),
+      contentType: contentTypeGuess,
+    });
+    return {
+      ...file,
+      filename: filenameFor(formatId, file.contentType || contentTypeGuess),
+    };
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw new AppError("Could not download this TikTok. Try another format.", 502);
+  }
 }
 
-export async function downloadTikTok(url, formatId) {
+export async function downloadTikTok(url, formatId, { range } = {}) {
   let cached = getCache(url);
   if (!pickCachedMedia(cached, formatId)) {
     await resolveTikTok(url);
@@ -428,8 +425,9 @@ export async function downloadTikTok(url, formatId) {
   }
 
   try {
-    return await proxyCdn(picked.mediaUrl, picked.resolvedId, picked.cookies);
+    return await proxyCdn(picked.mediaUrl, picked.resolvedId, picked.cookies, range);
   } catch {
+    mediaCache.delete(cacheKey(url));
     if (!formatId.startsWith("tt:")) {
       throw new AppError("Could not download this TikTok. Try another format.", 502);
     }
@@ -446,7 +444,7 @@ export async function downloadTikTok(url, formatId) {
     }
 
     try {
-      return await proxyCdn(picked.mediaUrl, picked.resolvedId, picked.cookies);
+      return await proxyCdn(picked.mediaUrl, picked.resolvedId, picked.cookies, range);
     } catch {
       throw new AppError("Could not download this TikTok. Try another format.", 502);
     }

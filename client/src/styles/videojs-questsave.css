@@ -22,21 +22,61 @@
 .questsave-player-cover .video-js,
 .questsave-player-cover video,
 .questsave-player-cover .vjs-tech {
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .questsave-player .video-js {
   font-family: var(--font-sans, "Inter", sans-serif);
   background-color: #000;
+  font-size: 1.1em;
+  color: #fff;
 }
 
 .questsave-player .vjs-control-bar {
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.85), transparent);
+  background: rgba(0, 0, 0, 0.92);
+  height: 3.4em;
+  color: #fff;
+  z-index: 20;
+}
+
+.questsave-player .vjs-control,
+.questsave-player .vjs-time-control,
+.questsave-player .vjs-remaining-time,
+.questsave-player .vjs-duration,
+.questsave-player .vjs-current-time,
+.questsave-player .vjs-playback-rate .vjs-playback-rate-value {
+  color: #fff;
+}
+
+.questsave-player .vjs-icon-placeholder:before {
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
 }
 
 .questsave-player .vjs-play-progress,
 .questsave-player .vjs-volume-level {
   background-color: #fe6022;
+}
+
+.questsave-player .vjs-slider,
+.questsave-player .vjs-progress-holder {
+  height: 0.45em;
+  background-color: rgba(255, 255, 255, 0.28);
+}
+
+.questsave-player .vjs-progress-control .vjs-progress-holder {
+  margin: 0 0.45em;
+}
+
+.questsave-player .vjs-play-progress:before {
+  color: #fe6022;
+  font-size: 1.05em;
+  text-shadow: none;
+}
+
+.questsave-player .vjs-load-progress,
+.questsave-player .vjs-load-progress div {
+  background: rgba(255, 255, 255, 0.22);
 }
 
 .questsave-player .vjs-big-play-button {
@@ -52,4 +92,10 @@
 
 .questsave-player .vjs-big-play-button:hover {
   background-color: #fe6022;
+}
+
+.questsave-player .vjs-mouse-display,
+.questsave-player .vjs-volume-tooltip,
+.questsave-player .vjs-time-tooltip {
+  color: #fff;
 }

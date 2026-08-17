@@ -1,6 +1,7 @@
 import axios from "axios";
 import { AppError } from "../utils/AppError.js";
 import { resolveMedia } from "./ytdlp.js";
+import { proxyCdnUrl } from "./cdnProxy.js";
 
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
@@ -420,44 +421,51 @@ export async function resolveTwitterPlayUrl(url, formatId) {
   return mediaUrl;
 }
 
-export async function downloadTwitter(url, formatId) {
-  let cached = getCache(url);
-  if (!cached?.urls?.[formatId]) {
-    await resolveTwitter(url);
-    cached = getCache(url);
-  }
+export async function downloadTwitter(url, formatId, { range } = {}) {
+  const loadUrl = async () => {
+    let cached = getCache(url);
+    if (!cached?.urls?.[formatId]) {
+      await resolveTwitter(url);
+      cached = getCache(url);
+    }
+    return cached?.urls?.[formatId] || "";
+  };
 
-  const mediaUrl = cached?.urls?.[formatId];
+  const run = async (mediaUrl) =>
+    proxyCdnUrl(mediaUrl, {
+      referer: "https://x.com/",
+      range,
+      filename: filenameFor(formatId, "video/mp4"),
+      contentType: formatId.includes(":img:") ? "image/jpeg" : "video/mp4",
+    });
+
+  let mediaUrl = await loadUrl();
   if (!mediaUrl) {
     throw new AppError("Could not resolve a downloadable file for this X post.", 422);
   }
 
   try {
-    const response = await axios.get(mediaUrl, {
-      responseType: "stream",
-      maxRedirects: 5,
-      timeout: 180_000,
-      headers: {
-        "User-Agent": USER_AGENT,
-        Referer: "https://x.com/",
-        Accept: "*/*",
-      },
-      validateStatus: (status) => status >= 200 && status < 400,
-    });
-
-    const contentType = response.headers["content-type"] || "application/octet-stream";
-    const size = Number(response.headers["content-length"]) || 0;
-
+    const file = await run(mediaUrl);
     return {
-      stream: response.data,
-      filename: filenameFor(formatId, contentType),
-      contentType,
-      size,
-      cleanup: () => {
-        response.data.destroy?.();
-      },
+      ...file,
+      filename: filenameFor(formatId, file.contentType || ""),
     };
-  } catch {
-    throw new AppError("Could not download this X media. Try again in a moment.", 502);
+  } catch (err) {
+    if (err instanceof AppError && err.statusCode === 422) throw err;
+    mediaCache.delete(cacheKey(url));
+    try {
+      mediaUrl = await loadUrl();
+      if (!mediaUrl) {
+        throw new AppError("Could not refresh this X media link.", 502);
+      }
+      const file = await run(mediaUrl);
+      return {
+        ...file,
+        filename: filenameFor(formatId, file.contentType || ""),
+      };
+    } catch (retryErr) {
+      if (retryErr instanceof AppError) throw retryErr;
+      throw new AppError("Could not download this X media. Try again in a moment.", 502);
+    }
   }
 }
