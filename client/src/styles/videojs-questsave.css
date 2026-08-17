@@ -7,9 +7,16 @@
   min-height: 320px;
 }
 
-.questsave-player-vertical .video-js {
+.questsave-player-vertical .video-js,
+.questsave-player-cover .video-js {
   width: 100%;
   height: 100%;
+}
+
+.questsave-player-cover .video-js,
+.questsave-player-cover video,
+.questsave-player-cover .vjs-tech {
+  object-fit: cover;
 }
 
 .questsave-player .video-js {

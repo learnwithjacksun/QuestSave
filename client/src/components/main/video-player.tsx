@@ -9,7 +9,7 @@ interface VideoPlayerProps {
   src: string;
   poster?: string;
   vertical?: boolean;
-  title?: string;
+  autoplay?: boolean;
   className?: string;
 }
 
@@ -17,6 +17,7 @@ export default function VideoPlayer({
   src,
   poster,
   vertical = false,
+  autoplay = false,
   className = "",
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -36,11 +37,6 @@ export default function VideoPlayer({
         pictureInPictureToggle: true,
         remainingTimeDisplay: true,
       },
-      html5: {
-        vhs: {
-          overrideNative: true,
-        },
-      },
     });
 
     playerRef.current = player;
@@ -51,24 +47,43 @@ export default function VideoPlayer({
         playerRef.current = null;
       }
     };
-  }, []);
+  }, [vertical]);
 
   useEffect(() => {
     const player = playerRef.current;
     if (!player || !src) return;
 
     player.src({ src, type: "video/mp4" });
-    if (poster) {
-      player.poster(poster);
-    }
+    if (poster) player.poster(poster);
   }, [src, poster]);
+
+  useEffect(() => {
+    const player = playerRef.current;
+    if (!player) return;
+
+    if (autoplay) {
+      const play = player.play();
+      if (play && typeof play.catch === "function") {
+        play.catch(() => {
+          player.muted(true);
+          void player.play();
+        });
+      }
+    } else {
+      player.pause();
+    }
+  }, [autoplay, src]);
 
   return (
     <div
       data-vjs-player
       className={`questsave-player ${vertical ? "questsave-player-vertical" : ""} ${className}`}
     >
-      <video ref={videoRef} className="video-js vjs-big-play-centered" playsInline />
+      <video
+        ref={videoRef}
+        className="video-js vjs-big-play-centered"
+        playsInline
+      />
     </div>
   );
 }

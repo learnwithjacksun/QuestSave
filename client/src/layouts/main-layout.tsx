@@ -5,31 +5,44 @@ import useSidebarStore from "@/store/useSidebarStore";
 import useTheme from "@/hooks/useTheme";
 import useAuthSession from "@/hooks/useAuthSession";
 import clsx from "clsx";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation, useSearchParams } from "react-router-dom";
 
 export default function MainLayout() {
   const { isOpen } = useSidebarStore();
+  const { pathname } = useLocation();
+  const [searchParams] = useSearchParams();
+  const watchMode = pathname === "/fyp" && Boolean(searchParams.get("watch"));
   useTheme();
   useAuthSession();
 
   return (
     <div className="flex h-dvh overflow-hidden bg-background">
-      <Sidebar />
+      <Sidebar hidden={watchMode} />
 
       <main
         className={clsx(
           "flex-1 flex flex-col overflow-hidden transition-[margin] duration-200 ease-in-out",
-          isOpen ? "md:ml-[260px]" : "md:ml-0"
+          isOpen && !watchMode ? "md:ml-[260px]" : "md:ml-0"
         )}
       >
-        <header className="flex items-center gap-2 px-4 py-3 shrink-0">
-          <SidebarToggle />
+        <header
+          className={clsx(
+            "flex items-center gap-2 px-4 py-3 shrink-0",
+            watchMode && "hidden md:flex md:absolute md:top-0 md:right-0 md:z-20 md:bg-transparent"
+          )}
+        >
+          {!watchMode && <SidebarToggle />}
           <div className="ml-auto">
             <ThemeToggle />
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto hide-scrollbar">
+        <div
+          className={clsx(
+            "flex-1 hide-scrollbar",
+            watchMode ? "overflow-hidden" : "overflow-y-auto"
+          )}
+        >
           <Outlet />
         </div>
       </main>

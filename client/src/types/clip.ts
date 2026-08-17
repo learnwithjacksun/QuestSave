@@ -70,3 +70,14 @@ export interface SharedClip {
 }
 
 export type LibraryTab = "saved" | "shared";
+
+export type FeedOrigin = "library" | "shared" | "preview" | "public";
+
+export interface FeedClip extends SavedClip {
+  origin: FeedOrigin;
+  sharedBy?: string;
+}
+
+export interface PreviewWatchState {
+  preview: FeedClip;
+}

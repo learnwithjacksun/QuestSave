@@ -13,19 +13,19 @@ import {
   Search01Icon,
   Share08Icon,
 } from "@hugeicons/core-free-icons";
-import { Icon, ShareClipModal, WatchModal } from "@/components/main";
+import { Icon, ShareClipModal } from "@/components/main";
 import Modal from "@/components/ui/modal";
 import {
   deleteClip,
   downloadClipFile,
   fetchReceivedShares,
   fetchSavedClips,
-  getClipStreamSrc,
   removeShare,
   resolveClip,
 } from "@/config/clipApi";
 import { getApiError } from "@/config/api";
 import { proxiedImageUrl } from "@/helpers/proxiedImageUrl";
+import { fypWatchPath } from "@/helpers/watchPath";
 import useAuthStore from "@/store/useAuthStore";
 import type { LibraryTab, SavedClip, SharedClip } from "@/types/clip";
 
@@ -105,7 +105,6 @@ export default function Library() {
   const [removingShareId, setRemovingShareId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SavedClip | null>(null);
   const [shareTarget, setShareTarget] = useState<SavedClip | null>(null);
-  const [watchTarget, setWatchTarget] = useState<SavedClip | null>(null);
   const [search, setSearch] = useState("");
   const [platform, setPlatform] = useState("all");
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
@@ -260,6 +259,7 @@ export default function Library() {
       busy: boolean;
       removing?: boolean;
       meta?: string;
+      from: "library" | "shared";
       onDelete?: () => void;
       onShare?: () => void;
       onRemoveShare?: () => void;
@@ -269,8 +269,31 @@ export default function Library() {
       key={options.key}
       className="rounded-2xl border border-line bg-surface/60 overflow-hidden flex flex-col"
     >
-      <div className="relative bg-hover aspect-video center lg:max-h-[200px] max-h-[100px]">
-        {clip.thumbnail ? (
+      <div className="relative bg-hover aspect-video center lg:max-h-[200px] max-h-[120px]">
+        {isWatchable(clip) ? (
+          <Link
+            to={fypWatchPath(clip.id, options.from === "shared" ? "shared" : "library")}
+            className="absolute inset-0"
+            title="Watch"
+          >
+            {clip.thumbnail ? (
+              <img
+                src={proxiedImageUrl(clip.thumbnail)}
+                alt={clip.title || "Saved clip"}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <span className="h-full w-full center">
+                <Icon icon={Bookmark02Icon} size={28} className="text-muted" />
+              </span>
+            )}
+            <span className="absolute inset-0 center bg-black/25 opacity-100 md:opacity-0 md:hover:opacity-100 transition-opacity">
+              <span className="h-10 w-10 rounded-full bg-primary/90 center text-white">
+                <Icon icon={PlayCircleIcon} size={22} />
+              </span>
+            </span>
+          </Link>
+        ) : clip.thumbnail ? (
           <img
             src={proxiedImageUrl(clip.thumbnail)}
             alt={clip.title || "Saved clip"}
@@ -279,21 +302,9 @@ export default function Library() {
         ) : (
           <Icon icon={Bookmark02Icon} size={28} className="text-muted" />
         )}
-        {isWatchable(clip) && (
-          <button
-            type="button"
-            title="Watch"
-            onClick={() => setWatchTarget(clip)}
-            className="absolute inset-0 center bg-black/20 opacity-0 hover:opacity-100 transition-opacity"
-          >
-            <span className="h-10 w-10 rounded-full bg-primary/90 center text-white">
-              <Icon icon={PlayCircleIcon} size={22} />
-            </span>
-          </button>
-        )}
       </div>
 
-      <div className="p-2 lg:p-4 flex flex-col gap-3 mt-auto">
+      <div className="p-2 lg:p-4 flex flex-col gap-3 mt-auto min-w-0">
         <div className="min-w-0">
           <p className="text-xs uppercase tracking-wide text-primary font-medium">
             {platformLabels[clip.platform] || clip.platform}
@@ -310,85 +321,79 @@ export default function Library() {
           <p className="text-xs text-muted mt-1">{formatSavedDate(clip.createdAt)}</p>
         </div>
 
-        <div className="flex gap-2 flex-col">
-          <div className="flex gap-2">
-            {isWatchable(clip) && (
-              <button
-                type="button"
-                onClick={() => setWatchTarget(clip)}
-                className="btn h-10 min-h-8 lg:min-h-10 flex-1 rounded-md border border-line text-main hover:bg-hover text-sm gap-1.5"
-              >
-                <Icon icon={PlayCircleIcon} size={16} />
-                Watch
-              </button>
+        <div className="flex items-center gap-1.5">
+          {isWatchable(clip) && (
+            <Link
+              to={fypWatchPath(clip.id, options.from === "shared" ? "shared" : "library")}
+              title="Watch"
+              className="btn h-9 w-9 shrink-0 rounded-lg border border-line text-main hover:bg-hover"
+            >
+              <Icon icon={PlayCircleIcon} size={16} />
+            </Link>
+          )}
+          <button
+            type="button"
+            title={options.busy ? "Downloading..." : "Download"}
+            onClick={() => void handleDownload(clip)}
+            disabled={options.busy || downloadingId !== null || options.removing}
+            className="btn btn-primary h-9 w-9 shrink-0 rounded-lg"
+          >
+            {options.busy ? (
+              <Loader className="animate-spin" size={16} />
+            ) : (
+              <Icon icon={Download01Icon} size={16} />
             )}
+          </button>
+          {options.onShare && (
             <button
               type="button"
-              onClick={() => void handleDownload(clip)}
-              disabled={options.busy || downloadingId !== null || options.removing}
-              className="btn btn-primary h-10 min-h-8 lg:min-h-10 flex-1 rounded-md text-sm gap-1.5"
+              title="Share"
+              onClick={options.onShare}
+              disabled={options.busy || options.removing}
+              className="btn h-9 w-9 shrink-0 rounded-lg border border-line text-main hover:bg-hover"
             >
-              {options.busy ? (
+              <Icon icon={Share08Icon} size={16} />
+            </button>
+          )}
+          <a
+            href={clip.sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Open original"
+            className="btn h-9 w-9 shrink-0 rounded-lg border border-line text-main hover:bg-hover"
+          >
+            <Icon icon={Link01Icon} size={16} />
+          </a>
+          {options.onDelete && (
+            <button
+              type="button"
+              title="Delete"
+              onClick={options.onDelete}
+              disabled={options.removing || options.busy}
+              className="btn h-9 w-9 shrink-0 rounded-lg border border-line text-main hover:bg-hover hover:text-red-500 ml-auto"
+            >
+              {options.removing ? (
                 <Loader className="animate-spin" size={16} />
               ) : (
-                <Icon icon={Download01Icon} size={16} />
+                <Icon icon={Delete02Icon} size={16} />
               )}
-              {options.busy ? "Downloading..." : "Download"}
             </button>
-          </div>
-          <div className="flex gap-2">
-            {options.onShare && (
-              <button
-                type="button"
-                title="Share"
-                onClick={options.onShare}
-                disabled={options.busy || options.removing}
-                className="btn h-8 lg:h-10 min-h-8 lg:min-h-10 flex-1 rounded-md border border-line text-main hover:bg-hover text-sm gap-1.5"
-              >
-                <Icon icon={Share08Icon} size={16} />
-                Share
-              </button>
-            )}
-            <a
-              href={clip.sourceUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Open original"
-              className="btn h-8 lg:h-10 min-h-8 lg:min-h-10 lg:w-10 w-full rounded-md border border-line text-main hover:bg-hover"
+          )}
+          {options.onRemoveShare && (
+            <button
+              type="button"
+              title="Remove"
+              onClick={options.onRemoveShare}
+              disabled={options.removing || options.busy}
+              className="btn h-9 w-9 shrink-0 rounded-lg border border-line text-main hover:bg-hover hover:text-red-500 ml-auto"
             >
-              <Icon icon={Link01Icon} size={16} />
-            </a>
-            {options.onDelete && (
-              <button
-                type="button"
-                title="Delete"
-                onClick={options.onDelete}
-                disabled={options.removing || options.busy}
-                className="btn h-8 lg:h-10 min-h-8 lg:min-h-10 lg:w-10 w-full rounded-md border border-line text-main hover:bg-hover hover:text-red-500"
-              >
-                {options.removing ? (
-                  <Loader className="animate-spin" size={16} />
-                ) : (
-                  <Icon icon={Delete02Icon} size={16} />
-                )}
-              </button>
-            )}
-            {options.onRemoveShare && (
-              <button
-                type="button"
-                title="Remove"
-                onClick={options.onRemoveShare}
-                disabled={options.removing || options.busy}
-                className="btn h-8 lg:h-10 min-h-8 lg:min-h-10 lg:w-10 w-full rounded-md border border-line text-main hover:bg-hover hover:text-red-500"
-              >
-                {options.removing ? (
-                  <Loader className="animate-spin" size={16} />
-                ) : (
-                  <Icon icon={Delete02Icon} size={16} />
-                )}
-              </button>
-            )}
-          </div>
+              {options.removing ? (
+                <Loader className="animate-spin" size={16} />
+              ) : (
+                <Icon icon={Delete02Icon} size={16} />
+              )}
+            </button>
+          )}
         </div>
       </div>
     </li>
@@ -574,6 +579,7 @@ export default function Library() {
                   key: clip.id,
                   busy: downloadingId === clip.id,
                   removing: deletingId === clip.id,
+                  from: "library",
                   onDelete: () => setDeleteTarget(clip),
                   onShare: () => setShareTarget(clip),
                 })
@@ -583,6 +589,7 @@ export default function Library() {
                   key: shareId,
                   busy: downloadingId === clip.id,
                   removing: removingShareId === shareId,
+                  from: "shared",
                   meta: `From @${sharedBy.username} · ${formatSavedDate(sharedAt)}`,
                   onRemoveShare: () => void handleRemoveShare(shareId),
                 })
@@ -626,18 +633,6 @@ export default function Library() {
           onClose={() => setShareTarget(null)}
           clipId={shareTarget.id}
           clipTitle={shareTarget.title}
-        />
-      )}
-
-      {watchTarget && (
-        <WatchModal
-          isOpen
-          onClose={() => setWatchTarget(null)}
-          title={watchTarget.title}
-          author={watchTarget.author}
-          poster={watchTarget.thumbnail}
-          platform={watchTarget.platform}
-          loadSrc={() => getClipStreamSrc(watchTarget.id)}
         />
       )}
     </div>
