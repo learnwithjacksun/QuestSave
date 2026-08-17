@@ -14,7 +14,11 @@ import useAuthStore from "@/store/useAuthStore";
 import type { SavedClip } from "@/types/clip";
 import Icon from "./icon";
 
-export default function Sidebar() {
+interface SidebarProps {
+  hidden?: boolean;
+}
+
+export default function Sidebar({ hidden = false }: SidebarProps) {
   const { isOpen, toggle, setOpen } = useSidebarStore();
   const { user, openOverlay } = useAuthStore();
   const [query, setQuery] = useState("");
@@ -54,7 +58,7 @@ export default function Sidebar() {
 
   return (
     <>
-      {isOpen && (
+      {isOpen && !hidden && (
         <div
           className="fixed inset-0 z-30 bg-black/50 md:hidden"
           onClick={() => setOpen(false)}
@@ -64,7 +68,7 @@ export default function Sidebar() {
       <aside
         className={clsx(
           "fixed top-0 left-0 z-40 h-full w-[260px] flex flex-col bg-sidebar border-r border-line transition-transform duration-200 ease-in-out",
-          isOpen ? "translate-x-0" : "-translate-x-full"
+          hidden || !isOpen ? "-translate-x-full" : "translate-x-0"
         )}
       >
         {/* Header */}

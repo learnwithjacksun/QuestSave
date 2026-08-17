@@ -30,7 +30,7 @@ export const navItems: NavItem[] = [
     label: "FYP",
     path: "/fyp",
     icon: PlayCircleIcon,
-    description: "Discover random clips from the internet",
+    description: "Watch your library in a TikTok-style feed",
   },
   {
     label: "Avatar Search",
