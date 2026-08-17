@@ -73,6 +73,16 @@ function pipeInlineStream(res, file, { filename = "questsave-clip" } = {}) {
 const STREAM_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
+function isPlayableContentType(contentType) {
+  const type = String(contentType || "").toLowerCase();
+  return (
+    type.includes("video/") ||
+    type.includes("audio/") ||
+    type.includes("mpegurl") ||
+    type.includes("octet-stream")
+  );
+}
+
 async function proxyPlayUrl(playUrl) {
   const response = await axios.get(playUrl, {
     responseType: "stream",
@@ -86,6 +96,11 @@ async function proxyPlayUrl(playUrl) {
   });
 
   const contentType = response.headers["content-type"] || "video/mp4";
+  if (!isPlayableContentType(contentType)) {
+    response.data.destroy?.();
+    throw new Error("Stored play URL is not a media stream");
+  }
+
   const size = Number(response.headers["content-length"]) || 0;
 
   return {
@@ -225,10 +240,7 @@ export const clipStreamAccess = asyncHandler(async (req, res) => {
     userId: req.user._id,
   });
 
-  const base = `${req.protocol}://${req.get("host")}`;
-  res.json({
-    src: `${base}/api/clips/${clip._id}/stream?token=${encodeURIComponent(token)}`,
-  });
+  res.json({ token });
 });
 
 export const streamClip = asyncHandler(async (req, res) => {
@@ -330,9 +342,8 @@ export const previewStreamUrl = asyncHandler(async (req, res) => {
 
   const { url } = detectPlatform(parsed.data.url);
   const formatId = sanitizeFormatId(parsed.data.formatId);
-  const base = `${req.protocol}://${req.get("host")}`;
 
   res.json({
-    src: `${base}/api/clips/preview/stream?url=${encodeURIComponent(url)}&formatId=${encodeURIComponent(formatId)}`,
+    path: `/api/clips/preview/stream?url=${encodeURIComponent(url)}&formatId=${encodeURIComponent(formatId)}`,
   });
 });

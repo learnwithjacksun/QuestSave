@@ -1,5 +1,11 @@
 .questsave-player {
   width: 100%;
+  height: 100%;
+}
+
+.questsave-player > div {
+  width: 100%;
+  height: 100%;
 }
 
 .questsave-player-vertical {

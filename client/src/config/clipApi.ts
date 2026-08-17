@@ -1,6 +1,10 @@
 import api, { getApiError } from "@/config/api";
 import type { AuthUser, ClipPreview, SavedClip, SharedClip } from "@/types/clip";
 
+function apiOrigin() {
+  return String(import.meta.env.VITE_BASE_URL || "").replace(/\/$/, "");
+}
+
 export async function resolveClip(url: string) {
   const { data } = await api.post<ClipPreview>("/api/clips/resolve", { url });
   return data;
@@ -103,15 +107,22 @@ export async function removeShare(shareId: string) {
 }
 
 export async function getPreviewStreamSrc(url: string, formatId: string) {
-  const { data } = await api.get<{ src: string }>("/api/clips/preview/stream-url", {
-    params: { url, formatId },
-  });
-  return data.src;
+  const { data } = await api.get<{ path?: string; src?: string }>(
+    "/api/clips/preview/stream-url",
+    { params: { url, formatId } }
+  );
+  if (data.path) return `${apiOrigin()}${data.path}`;
+  return data.src || "";
 }
 
 export async function getClipStreamSrc(clipId: string) {
-  const { data } = await api.get<{ src: string }>(`/api/clips/${clipId}/stream-access`);
-  return data.src;
+  const { data } = await api.get<{ token?: string; src?: string }>(
+    `/api/clips/${clipId}/stream-access`
+  );
+  if (data.token) {
+    return `${apiOrigin()}/api/clips/${clipId}/stream?token=${encodeURIComponent(data.token)}`;
+  }
+  return data.src || "";
 }
 
 function axiosErrorBlob(error: unknown): error is { response: { data: Blob } } {

@@ -326,7 +326,7 @@ export default function Library() {
             <Link
               to={fypWatchPath(clip.id, options.from === "shared" ? "shared" : "library")}
               title="Watch"
-              className="btn h-9 w-9 shrink-0 rounded-lg border border-line text-main hover:bg-hover"
+              className="btn h-9 w-9 shrink-0 rounded-lg border border-line text-main hover:bg-hover hidden md:flex"
             >
               <Icon icon={PlayCircleIcon} size={16} />
             </Link>
