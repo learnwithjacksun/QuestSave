@@ -1,9 +1,7 @@
 import axios from "axios";
 import env from "../../config/env.js";
 import { AppError } from "../../utils/AppError.js";
-
-const USER_AGENT =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+import { proxyCdnUrl } from "../cdnProxy.js";
 
 const RAPIDAPI_PLATFORMS = new Set(["youtube", "instagram", "facebook"]);
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -109,6 +107,17 @@ function refererFor(platform) {
 
 function httpUrl(value) {
   return typeof value === "string" && /^https?:\/\//i.test(value) ? value : "";
+}
+
+function mediaUrlFromItem(item) {
+  return (
+    httpUrl(item?.url) ||
+    httpUrl(item?.link) ||
+    httpUrl(item?.downloadUrl) ||
+    httpUrl(item?.download_url) ||
+    httpUrl(item?.videoUrl) ||
+    httpUrl(item?.video_url)
+  );
 }
 
 function asArray(value) {
@@ -409,10 +418,12 @@ function previewFromItems({ platform, sourceUrl, title, author, thumbnail, stats
 }
 
 function normalizeYouTube(data, sourceUrl) {
-  const combined = asArray(data?.formats).filter((item) => httpUrl(item?.url) && youtubeCombined(item));
+  const combined = [...asArray(data?.formats), ...asArray(data?.adaptiveFormats)].filter(
+    (item) => mediaUrlFromItem(item) && youtubeCombined(item)
+  );
   const items = combined.map((item) => ({
     kind: "video",
-    url: item.url,
+    url: mediaUrlFromItem(item),
     mime: item.mimeType || item.mime_type,
     height: item.height,
     qualityLabel: item.qualityLabel || item.quality_label,
@@ -441,7 +452,7 @@ function normalizeInstagram(data, sourceUrl) {
       const kind = mediaKindFromType(item?.type);
       return {
         kind,
-        url: item?.url,
+        url: mediaUrlFromItem(item),
         mime: item?.type,
         ext: extFromMime(item?.type, kind),
         filesize: item?.size,
@@ -556,36 +567,18 @@ function contentTypeFor(entry) {
   return entry.ext === "webm" ? "video/webm" : "video/mp4";
 }
 
-async function proxyCdn(mediaUrl, entry) {
-  try {
-    const response = await axios.get(mediaUrl, {
-      responseType: "stream",
-      maxRedirects: 5,
-      timeout: 180_000,
-      headers: {
-        "User-Agent": USER_AGENT,
-        Referer: entry.referer || "https://www.youtube.com/",
-        Accept: "*/*",
-      },
-      validateStatus: (status) => status >= 200 && status < 400,
-    });
-
-    const contentType = response.headers["content-type"] || contentTypeFor(entry);
-    const size = Number(response.headers["content-length"]) || 0;
-
-    return {
-      stream: response.data,
-      filename: filenameFor({ ...entry, mimeType: contentType }),
-      contentType,
-      size,
-      cleanup: () => {
-        response.data.destroy?.();
-      },
-    };
-  } catch (err) {
-    if (err instanceof AppError) throw err;
-    throw new AppError("Could not download this file. Try another quality.", 502);
-  }
+async function proxyCdn(mediaUrl, entry, range) {
+  const file = await proxyCdnUrl(mediaUrl, {
+    referer: entry.referer || refererFor("youtube"),
+    range,
+    filename: filenameFor(entry),
+    contentType: contentTypeFor(entry),
+  });
+  return {
+    ...file,
+    filename: filenameFor({ ...entry, mimeType: file.contentType }),
+    contentType: file.contentType || contentTypeFor(entry),
+  };
 }
 
 function pickMedia(cached, formatId) {
@@ -611,7 +604,7 @@ export async function resolveSocialMediaPlayUrl(url, formatId, platform) {
   return entry.videoUrl;
 }
 
-export async function downloadSocialMedia(url, formatId, platform) {
+export async function downloadSocialMedia(url, formatId, platform, { range } = {}) {
   let cached = getCache(url, platform);
   if (!cached?.media?.[formatId] && !cached?.media?.["rap:best"]) {
     await resolveSocialMedia(url, platform);
@@ -623,7 +616,7 @@ export async function downloadSocialMedia(url, formatId, platform) {
     throw new AppError("Could not resolve a downloadable file for this post.", 422);
   }
 
-  const run = async (selected) => proxyCdn(selected.videoUrl, selected);
+  const run = async (selected) => proxyCdn(selected.videoUrl, selected, range);
 
   try {
     return await run(entry);

@@ -267,9 +267,9 @@ export default function Library() {
   ) => (
     <li
       key={options.key}
-      className="rounded-2xl border border-line bg-surface/60 overflow-hidden flex flex-col"
+      className="rounded-2xl border border-line bg-surface/60 overflow-hidden flex flex-row sm:flex-col"
     >
-      <div className="relative bg-hover aspect-video center lg:max-h-[200px] max-h-[120px]">
+      <div className="relative bg-hover w-32 sm:w-full shrink-0 aspect-video">
         {isWatchable(clip) ? (
           <Link
             to={fypWatchPath(clip.id, options.from === "shared" ? "shared" : "library")}
@@ -287,9 +287,9 @@ export default function Library() {
                 <Icon icon={Bookmark02Icon} size={28} className="text-muted" />
               </span>
             )}
-            <span className="absolute inset-0 center bg-black/25 opacity-100 md:opacity-0 md:hover:opacity-100 transition-opacity">
-              <span className="h-10 w-10 rounded-full bg-primary/90 center text-white">
-                <Icon icon={PlayCircleIcon} size={22} />
+            <span className="absolute inset-0 center bg-black/20 opacity-100 sm:opacity-0 sm:hover:opacity-100 transition-opacity">
+              <span className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-primary/90 center text-white">
+                <Icon icon={PlayCircleIcon} size={18} />
               </span>
             </span>
           </Link>
@@ -300,11 +300,13 @@ export default function Library() {
             className="h-full w-full object-cover"
           />
         ) : (
-          <Icon icon={Bookmark02Icon} size={28} className="text-muted" />
+          <span className="h-full w-full center">
+            <Icon icon={Bookmark02Icon} size={28} className="text-muted" />
+          </span>
         )}
       </div>
 
-      <div className="p-2 lg:p-4 flex flex-col gap-3 mt-auto min-w-0">
+      <div className="px-3 py-2.5 sm:p-3 lg:px-4 lg:py-3 flex flex-col gap-2 min-w-0 flex-1">
         <div className="min-w-0">
           <p className="text-xs uppercase tracking-wide text-primary font-medium">
             {platformLabels[clip.platform] || clip.platform}
@@ -321,12 +323,12 @@ export default function Library() {
           <p className="text-xs text-muted mt-1">{formatSavedDate(clip.createdAt)}</p>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 mt-auto">
           {isWatchable(clip) && (
             <Link
               to={fypWatchPath(clip.id, options.from === "shared" ? "shared" : "library")}
               title="Watch"
-              className="hidden md:inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line text-main hover:bg-hover"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line text-main hover:bg-hover"
             >
               <Icon icon={PlayCircleIcon} size={16} />
             </Link>
@@ -370,7 +372,7 @@ export default function Library() {
               title="Delete"
               onClick={options.onDelete}
               disabled={options.removing || options.busy}
-              className="btn h-9 w-9 shrink-0 rounded-lg border border-line text-main hover:bg-hover hover:text-red-500 ml-auto"
+              className="btn h-9 w-9 shrink-0 rounded-lg border border-line text-main hover:bg-hover hover:text-red-500"
             >
               {options.removing ? (
                 <Loader className="animate-spin" size={16} />
@@ -385,7 +387,7 @@ export default function Library() {
               title="Remove"
               onClick={options.onRemoveShare}
               disabled={options.removing || options.busy}
-              className="btn h-9 w-9 shrink-0 rounded-lg border border-line text-main hover:bg-hover hover:text-red-500 ml-auto"
+              className="btn h-9 w-9 shrink-0 rounded-lg border border-line text-main hover:bg-hover hover:text-red-500"
             >
               {options.removing ? (
                 <Loader className="animate-spin" size={16} />

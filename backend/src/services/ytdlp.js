@@ -5,6 +5,7 @@ import os from "os";
 import path from "path";
 import env from "../config/env.js";
 import { AppError } from "../utils/AppError.js";
+import { applyFileRange } from "./cdnProxy.js";
 
 const FORMAT_ID_SAFE = /^[a-zA-Z0-9._+\-*/[\]():]+$/;
 const USER_AGENT =
@@ -525,7 +526,21 @@ export async function resolveYtdlpPlayUrl(url, formatId) {
   return line;
 }
 
-export async function downloadMedia(url, formatId) {
+export function ytdlpFallbackFormat(formatId) {
+  const id = String(formatId || "");
+  if (
+    !id ||
+    id.startsWith("rap:") ||
+    id.startsWith("tt:") ||
+    id.startsWith("tikwm:") ||
+    id.startsWith("x:")
+  ) {
+    return "bv*+ba/b";
+  }
+  return id;
+}
+
+export async function downloadMedia(url, formatId, { range } = {}) {
   if (!FORMAT_ID_SAFE.test(formatId) || formatId.length > 80) {
     throw new AppError("Invalid format", 400);
   }
@@ -589,13 +604,14 @@ export async function downloadMedia(url, formatId) {
     const info = await stat(filePath);
     const ext = path.extname(clipFile).slice(1) || "mp4";
 
-    return {
+    const file = {
       stream: createReadStream(filePath),
       filename: `questsave.${ext}`,
       contentType: contentTypeFor(ext),
       size: info.size,
       cleanup: () => rm(tmpDir, { recursive: true, force: true }),
     };
+    return applyFileRange(file, filePath, range);
   } catch (err) {
     await rm(tmpDir, { recursive: true, force: true }).catch(() => {});
     throw err;

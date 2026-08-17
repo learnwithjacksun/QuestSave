@@ -27,7 +27,7 @@ app.use(
   cors({
     origin: allowedOrigins,
     credentials: true,
-    exposedHeaders: ["Content-Disposition"],
+    exposedHeaders: ["Content-Disposition", "Content-Range", "Accept-Ranges", "Content-Length"],
   }),
 );
 app.use(cookieParser());

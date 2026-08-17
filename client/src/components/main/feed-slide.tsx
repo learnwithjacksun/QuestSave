@@ -119,9 +119,9 @@ export default function FeedSlide({
         <div className="h-full bg-black" />
       )}
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/80 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-14 h-24 bg-gradient-to-t from-black/70 to-transparent" />
 
-      <div className="absolute bottom-16 left-4 right-20 z-10 text-white">
+      <div className="pointer-events-none absolute bottom-20 left-4 right-20 z-10 text-white">
         <p className="text-[11px] uppercase tracking-wide text-primary font-medium">
           {platformLabels[clip.platform] || clip.platform}
           {clip.origin === "shared" && clip.sharedBy
@@ -140,7 +140,7 @@ export default function FeedSlide({
         ) : null}
       </div>
 
-      <div className="absolute right-3 bottom-28 z-10 flex flex-col gap-3">
+      <div className="absolute right-3 bottom-24 z-10 flex flex-col gap-3">
         {onDownload && (
           <button
             type="button"

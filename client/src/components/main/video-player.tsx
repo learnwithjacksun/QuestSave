@@ -53,10 +53,14 @@ export default function VideoPlayer({
       fluid: !vertical,
       fill: vertical,
       poster,
-      playbackRates: [0.5, 0.75, 1, 1.25, 1.5, 2],
+      playsinline: true,
+      playbackRates: vertical ? [] : [0.5, 0.75, 1, 1.25, 1.5, 2],
+      inactivityTimeout: 2500,
       controlBar: {
-        pictureInPictureToggle: true,
+        pictureInPictureToggle: !vertical,
         remainingTimeDisplay: true,
+        playbackRateMenuButton: !vertical,
+        volumePanel: vertical ? { inline: false } : { inline: true },
       },
       sources: [{ src, type: sourceType(src, mimeType) }],
     });
