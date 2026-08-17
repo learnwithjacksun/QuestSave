@@ -173,7 +173,7 @@ export default function Home() {
         {loading && (
           <div className="mt-6 flex items-center justify-center gap-2 text-sm text-muted">
             <Loader className="animate-spin" size={18} />
-            Fetching preview...
+            Processing...
           </div>
         )}
         {error && !loading && (

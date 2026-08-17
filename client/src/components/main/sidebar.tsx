@@ -162,7 +162,7 @@ export default function Sidebar() {
                   <NavLink
                     to={`/saves?id=${encodeURIComponent(clip.id)}`}
                     onClick={() => window.innerWidth < 768 && setOpen(false)}
-                    className="block w-full text-left px-3 py-2 rounded-lg text-sm text-main hover:bg-hover transition-colors truncate"
+                    className="block w-full text-left px-3 py-2 rounded-lg text-xs md:text-sm text-main hover:bg-hover transition-colors truncate"
                   >
                     {clip.title || clip.sourceUrl}
                   </NavLink>
