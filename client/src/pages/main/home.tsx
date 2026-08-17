@@ -28,6 +28,7 @@ export default function Home() {
   const [formatId, setFormatId] = useState("");
   const [slideInfo, setSlideInfo] = useState<SelectedSlideInfo | null>(null);
   const [saveOpen, setSaveOpen] = useState(false);
+  const [inputReset, setInputReset] = useState(0);
   const savingRef = useRef(false);
   const pendingKindRef = useRef<"save-download" | "save">("save-download");
 
@@ -45,6 +46,7 @@ export default function Home() {
     setSaveOpen(false);
     setModalAction(null);
     setPendingSave(false);
+    setInputReset((n) => n + 1);
   };
 
   const handleResolve = async (url: string) => {
@@ -168,7 +170,7 @@ export default function Home() {
           social media platforms
         </h1>
 
-        <LinkInput onSubmit={handleResolve} loading={loading} />
+        <LinkInput onSubmit={handleResolve} loading={loading} resetNonce={inputReset} />
 
         {loading && (
           <div className="mt-6 flex items-center justify-center gap-2 text-sm text-muted">

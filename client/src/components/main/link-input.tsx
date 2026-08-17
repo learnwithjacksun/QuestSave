@@ -10,6 +10,7 @@ interface LinkInputProps {
   placeholder?: string;
   className?: string;
   loading?: boolean;
+  resetNonce?: number;
 }
 
 export default function LinkInput({
@@ -17,6 +18,7 @@ export default function LinkInput({
   placeholder = "Paste a social media link to save...",
   className,
   loading = false,
+  resetNonce = 0,
 }: LinkInputProps) {
   const [url, setUrl] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -37,6 +39,14 @@ export default function LinkInput({
       if (debounceRef.current) window.clearTimeout(debounceRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!resetNonce) return;
+    setUrl("");
+    lastSubmitted.current = "";
+    if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    inputRef.current?.focus();
+  }, [resetNonce]);
 
   const handlePaste = async () => {
     try {
@@ -105,7 +115,7 @@ export default function LinkInput({
           className="flex-1 bg-transparent text-main placeholder:text-muted text-[15px] min-w-0"
         />
 
-        <div className="flex items-center gap-4 shrink-0">
+        <div className="flex items-center gap-2 md:gap-4 shrink-0">
           <button
             type="button"
             onClick={handlePaste}
