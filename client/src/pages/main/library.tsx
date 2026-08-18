@@ -26,7 +26,7 @@ import { fypWatchPath } from "@/helpers/watchPath";
 import { useInvalidateClipCaches, useLibraryData } from "@/hooks";
 import useAuthStore from "@/store/useAuthStore";
 import useDownloadStore from "@/store/useDownloadStore";
-import type { LibraryTab, SavedClip } from "@/types/clip";
+import type { LibraryTab, SavedClip, SharedClip } from "@/types/clip";
 import { PLATFORM_FILTERS, PLATFORM_LABELS } from "@/constants/platforms";
 
 const DATE_FILTERS = [
@@ -38,6 +38,9 @@ const DATE_FILTERS = [
 ] as const;
 
 type DateFilter = (typeof DATE_FILTERS)[number]["value"];
+
+const EMPTY_CLIPS: SavedClip[] = [];
+const EMPTY_SHARES: SharedClip[] = [];
 
 const LIBRARY_TABS: { value: LibraryTab; label: string }[] = [
   { value: "saved", label: "Saved" },
@@ -79,8 +82,8 @@ export default function Library() {
   const activeTab: LibraryTab = tabParam === "shared" ? "shared" : "saved";
   const libraryQuery = useLibraryData();
   const invalidateClips = useInvalidateClipCaches();
-  const clips = libraryQuery.data?.clips || [];
-  const sharedClips = libraryQuery.data?.shares || [];
+  const clips = libraryQuery.data?.clips ?? EMPTY_CLIPS;
+  const sharedClips = libraryQuery.data?.shares ?? EMPTY_SHARES;
   const loading = Boolean(user) && libraryQuery.isPending;
 
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
