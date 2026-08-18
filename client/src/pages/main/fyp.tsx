@@ -1,19 +1,15 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import clsx from "clsx";
 import { Loader } from "lucide-react";
 import { toast } from "sonner";
 import { PlayCircleIcon } from "@hugeicons/core-free-icons";
 import { Icon, ShareClipModal, SnapFeed } from "@/components/main";
-import {
-  fetchDiscoverClips,
-  fetchReceivedShares,
-  fetchSavedClips,
-  resolveClip,
-} from "@/config/clipApi";
+import { resolveClip } from "@/config/clipApi";
 import { getApiError } from "@/config/api";
 import { proxiedImageUrl } from "@/helpers/proxiedImageUrl";
 import { fypBackPath, fypWatchPath } from "@/helpers/watchPath";
+import { useDiscoverClips, useLibraryData } from "@/hooks";
 import useAuthStore from "@/store/useAuthStore";
 import useDownloadStore from "@/store/useDownloadStore";
 import type { FeedClip, FypTab, PreviewWatchState, SavedClip } from "@/types/clip";
@@ -99,6 +95,7 @@ function EmptyState({
 export default function Fyp() {
   const { user, hydrated, openOverlay } = useAuthStore();
   const queueDownload = useDownloadStore((state) => state.queueDownload);
+  const queueClipDownload = useDownloadStore((state) => state.queueClipDownload);
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const watchId = searchParams.get("watch");
@@ -108,12 +105,32 @@ export default function Fyp() {
   const watchState = (location.state as PreviewWatchState | null) || null;
   const previewState = watchState?.preview;
   const playlist = watchState?.playlist;
-
-  const [discover, setDiscover] = useState<FeedClip[]>([]);
-  const [library, setLibrary] = useState<FeedClip[]>([]);
-  const [discoverLoading, setDiscoverLoading] = useState(true);
-  const [libraryLoading, setLibraryLoading] = useState(false);
   const [shareTarget, setShareTarget] = useState<FeedClip | null>(null);
+
+  const discoverQuery = useDiscoverClips();
+  const libraryQuery = useLibraryData();
+
+  const discover = useMemo(
+    () =>
+      (discoverQuery.data || [])
+        .filter(isPlayable)
+        .map((clip) => toFeedClip(clip, "public", clip.ownerUsername)),
+    [discoverQuery.data]
+  );
+
+  const library = useMemo(() => {
+    const saved = libraryQuery.data?.clips || [];
+    const received = libraryQuery.data?.shares || [];
+    const own = saved.filter(isPlayable).map((clip) => toFeedClip(clip, "library"));
+    const shared = received
+      .filter((item) => isPlayable(item.clip))
+      .map((item) => toFeedClip(item.clip, "shared", item.sharedBy.username));
+    const seen = new Set(own.map((clip) => clip.id));
+    return [...own, ...shared.filter((clip) => !seen.has(clip.id))];
+  }, [libraryQuery.data]);
+
+  const discoverLoading = discoverQuery.isPending;
+  const libraryLoading = Boolean(user) && libraryQuery.isPending;
 
   const setActiveTab = (tab: FypTab) => {
     const next = new URLSearchParams(searchParams);
@@ -122,61 +139,6 @@ export default function Fyp() {
     else next.set("tab", tab);
     setSearchParams(next, { replace: true });
   };
-
-  useEffect(() => {
-    let mounted = true;
-    setDiscoverLoading(true);
-    fetchDiscoverClips()
-      .then((clips) => {
-        if (!mounted) return;
-        setDiscover(
-          clips.filter(isPlayable).map((clip) => toFeedClip(clip, "public", clip.ownerUsername))
-        );
-      })
-      .catch((err) => {
-        if (mounted) {
-          setDiscover([]);
-          toast.error(getApiError(err, "Could not load Discover"));
-        }
-      })
-      .finally(() => {
-        if (mounted) setDiscoverLoading(false);
-      });
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!hydrated || !user) {
-      setLibrary([]);
-      setLibraryLoading(false);
-      return;
-    }
-
-    let mounted = true;
-    setLibraryLoading(true);
-    Promise.all([fetchSavedClips(), fetchReceivedShares()])
-      .then(([saved, received]) => {
-        if (!mounted) return;
-        const own = saved.filter(isPlayable).map((clip) => toFeedClip(clip, "library"));
-        const shared = received
-          .filter((item) => isPlayable(item.clip))
-          .map((item) => toFeedClip(item.clip, "shared", item.sharedBy.username));
-        const seen = new Set(own.map((clip) => clip.id));
-        setLibrary([...own, ...shared.filter((clip) => !seen.has(clip.id))]);
-      })
-      .catch((err) => {
-        toast.error(getApiError(err, "Could not load clips"));
-      })
-      .finally(() => {
-        if (mounted) setLibraryLoading(false);
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, [hydrated, user]);
 
   const feedSource = from === "discover" ? discover : library;
   const feedItems = useMemo(() => {
@@ -196,18 +158,26 @@ export default function Fyp() {
 
   const handleDownload = async (clip: FeedClip) => {
     try {
-      let formatId = clip.formatId || "";
-      if (!formatId) {
-        const preview = await resolveClip(clip.sourceUrl);
-        formatId = preview.formats[0]?.id || "";
+      if (clip.origin === "preview" || clip.origin === "youtube") {
+        let formatId = clip.formatId || "";
+        if (!formatId) {
+          const preview = await resolveClip(clip.sourceUrl);
+          formatId = preview.formats[0]?.id || "";
+        }
+        if (!formatId) throw new Error("No download format available");
+        await queueDownload({
+          key: clip.id,
+          url: clip.sourceUrl,
+          formatId,
+          title: clip.title,
+        });
+      } else {
+        await queueClipDownload({
+          key: clip.id,
+          clipId: clip.id,
+          title: clip.title,
+        });
       }
-      if (!formatId) throw new Error("No download format available");
-      await queueDownload({
-        key: clip.id,
-        url: clip.sourceUrl,
-        formatId,
-        title: clip.title,
-      });
       toast.success("Saved to your device");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : getApiError(err, "Download failed"));

@@ -154,6 +154,20 @@ export async function getClipStreamSrc(clipId: string) {
   return data.src || "";
 }
 
+export async function startSavedClipDownload(clipId: string) {
+  const { data } = await api.get<{ token?: string }>(`/api/clips/${clipId}/stream-access`);
+  if (!data.token) {
+    throw new Error("Could not start download");
+  }
+  const href = `${apiOrigin()}/api/clips/${encodeURIComponent(clipId)}/download?token=${encodeURIComponent(data.token)}`;
+  const link = document.createElement("a");
+  link.href = href;
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
 export interface PlaybackSource {
   src: string;
   type: string;

@@ -3,6 +3,7 @@ import {
   clipStreamAccess,
   deleteClip,
   downloadClip,
+  downloadSavedClip,
   listClips,
   listDiscover,
   previewStream,
@@ -25,6 +26,7 @@ router.get("/preview/stream", previewStream);
 router.post("/save", requireAuth, saveClip);
 router.get("/", requireAuth, listClips);
 router.get("/:id/stream-access", optionalAuth, clipStreamAccess);
+router.get("/:id/download", optionalAuth, downloadSavedClip);
 router.get("/:id/stream", streamClip);
 router.delete("/:id", requireAuth, deleteClip);
 

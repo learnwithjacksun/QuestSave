@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import clsx from "clsx";
 import { Loader } from "lucide-react";
@@ -17,14 +17,13 @@ import { Icon, ShareClipModal } from "@/components/main";
 import Modal from "@/components/ui/modal";
 import {
   deleteClip,
-  fetchReceivedShares,
-  fetchSavedClips,
   removeShare,
   resolveClip,
 } from "@/config/clipApi";
 import { getApiError } from "@/config/api";
 import { proxiedImageUrl } from "@/helpers/proxiedImageUrl";
 import { fypWatchPath } from "@/helpers/watchPath";
+import { useInvalidateClipCaches, useLibraryData } from "@/hooks";
 import useAuthStore from "@/store/useAuthStore";
 import useDownloadStore from "@/store/useDownloadStore";
 import type { LibraryTab, SavedClip, SharedClip } from "@/types/clip";
@@ -78,12 +77,15 @@ export default function Library() {
   const focusId = searchParams.get("id");
   const tabParam = searchParams.get("tab");
   const activeTab: LibraryTab = tabParam === "shared" ? "shared" : "saved";
+  const libraryQuery = useLibraryData();
+  const invalidateClips = useInvalidateClipCaches();
+  const clips = libraryQuery.data?.clips || [];
+  const sharedClips = libraryQuery.data?.shares || [];
+  const loading = Boolean(user) && libraryQuery.isPending;
 
-  const [clips, setClips] = useState<SavedClip[]>([]);
-  const [sharedClips, setSharedClips] = useState<SharedClip[]>([]);
-  const [loading, setLoading] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const queueDownload = useDownloadStore((state) => state.queueDownload);
+  const queueClipDownload = useDownloadStore((state) => state.queueClipDownload);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [removingShareId, setRemovingShareId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SavedClip | null>(null);
@@ -110,42 +112,12 @@ export default function Library() {
     setSearchParams(next, { replace: true });
   };
 
-  const loadLibrary = useCallback(async () => {
-    if (!user) {
-      setClips([]);
-      setSharedClips([]);
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const [saved, received] = await Promise.all([
-        fetchSavedClips(),
-        fetchReceivedShares(),
-      ]);
-      setClips(saved);
-      setSharedClips(received);
-    } catch (err) {
-      setClips([]);
-      setSharedClips([]);
-      toast.error(getApiError(err, "Could not load your library"));
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
-
   useEffect(() => {
     if (!focusId || activeTab !== "saved") return;
     setSearch("");
     setPlatform("all");
     setDateFilter("all");
   }, [focusId, activeTab]);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    void loadLibrary();
-  }, [hydrated, loadLibrary]);
 
   const filteredSaved = useMemo(() => {
     if (focusId) {
@@ -183,20 +155,25 @@ export default function Library() {
   const handleDownload = async (clip: SavedClip) => {
     setDownloadingId(clip.id);
     try {
-      let formatId = clip.formatId || "";
-      if (!formatId) {
+      if (clip.formatId) {
+        await queueClipDownload({
+          key: clip.id,
+          clipId: clip.id,
+          title: clip.title,
+        });
+      } else {
         const preview = await resolveClip(clip.sourceUrl);
-        formatId = preview.formats[0]?.id || "";
+        const formatId = preview.formats[0]?.id || "";
+        if (!formatId) {
+          throw new Error("No download format available");
+        }
+        await queueDownload({
+          key: clip.id,
+          url: clip.sourceUrl,
+          formatId,
+          title: clip.title,
+        });
       }
-      if (!formatId) {
-        throw new Error("No download format available");
-      }
-      await queueDownload({
-        key: clip.id,
-        url: clip.sourceUrl,
-        formatId,
-        title: clip.title,
-      });
       toast.success("Saved to your device");
     } catch (err) {
       toast.error(
@@ -211,14 +188,12 @@ export default function Library() {
     if (!deleteTarget) return;
     const id = deleteTarget.id;
     setDeletingId(id);
-    const previous = clips;
-    setClips((list) => list.filter((c) => c.id !== id));
     setDeleteTarget(null);
     try {
       await deleteClip(id);
+      invalidateClips();
       toast.success("Removed from library");
     } catch (err) {
-      setClips(previous);
       toast.error(getApiError(err, "Could not delete clip"));
     } finally {
       setDeletingId(null);
@@ -227,13 +202,11 @@ export default function Library() {
 
   const handleRemoveShare = async (shareId: string) => {
     setRemovingShareId(shareId);
-    const previous = sharedClips;
-    setSharedClips((list) => list.filter((item) => item.shareId !== shareId));
     try {
       await removeShare(shareId);
+      invalidateClips();
       toast.success("Removed from Shared with me");
     } catch (err) {
-      setSharedClips(previous);
       toast.error(getApiError(err, "Could not remove shared clip"));
     } finally {
       setRemovingShareId(null);

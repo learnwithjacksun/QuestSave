@@ -7,7 +7,15 @@ import { BrowserRouter } from "react-router-dom";
 import { applyTheme } from "@/hooks/useTheme";
 import { defaultTheme, type ThemeMode } from "@/constants/themes";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60_000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 try {
   const stored = localStorage.getItem("theme");

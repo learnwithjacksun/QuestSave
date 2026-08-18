@@ -18,6 +18,7 @@ import { getApiError } from "@/config/api";
 import { formatCount } from "@/helpers/formatCount";
 import { proxiedImageUrl } from "@/helpers/proxiedImageUrl";
 import useAuthStore from "@/store/useAuthStore";
+import { useInvalidateClipCaches } from "@/hooks";
 import useDownloadStore from "@/store/useDownloadStore";
 import type { ClipFormat, ClipPreview, ClipVisibility, FeedClip, YoutubeSearchVideo } from "@/types/clip";
 
@@ -77,6 +78,7 @@ export default function YoutubeSearch() {
   const visibilityRef = useRef<ClipVisibility>("private");
   const lastSearch = useRef("");
   const queueDownload = useDownloadStore((state) => state.queueDownload);
+  const invalidateClips = useInvalidateClipCaches();
 
   const selectedFormat = preview?.formats.find((fmt) => fmt.id === formatId);
   const activeFormatId =
@@ -188,6 +190,7 @@ export default function YoutubeSearch() {
       mediaType: preview.mediaType,
       visibility,
     });
+    invalidateClips();
   };
 
   const runDownload = async () => {

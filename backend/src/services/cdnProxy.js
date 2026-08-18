@@ -96,7 +96,7 @@ export function applyFileRange(file, filePath, rangeHeader) {
 }
 
 export async function proxyCdnUrl(mediaUrl, options = {}) {
-  const { referer, cookies, range, filename, contentType, sendOrigin = false } = options;
+  const { referer, cookies, range, filename, contentType, sendOrigin = false, timeout } = options;
   const headers = {
     "User-Agent": CDN_USER_AGENT,
     Accept: "*/*",
@@ -130,7 +130,7 @@ export async function proxyCdnUrl(mediaUrl, options = {}) {
     const response = await axios.get(mediaUrl, {
       responseType: "stream",
       maxRedirects: 5,
-      timeout: 180_000,
+      timeout: Number(timeout) || 180_000,
       headers,
       validateStatus: (status) => status >= 200 && status < 400,
     });

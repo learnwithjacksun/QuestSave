@@ -39,8 +39,11 @@
   z-index: 20;
 }
 
-.questsave-player-vertical .vjs-control-bar {
-  height: 2.4em;
+.questsave-player-vertical .vjs-control-bar,
+.questsave-player-vertical .vjs-big-play-button,
+.questsave-player-vertical .vjs-volume-panel,
+.questsave-player-vertical .vjs-mute-control {
+  display: none !important;
 }
 
 .questsave-player .vjs-control,

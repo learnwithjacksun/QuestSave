@@ -112,8 +112,16 @@ async function fetchMediaFile(sourceUrl, formatId, { range } = {}) {
   return downloadMedia(url, id, options);
 }
 
+function playableContentType(contentType, fallback = "video/mp4") {
+  const type = String(contentType || "").toLowerCase();
+  if (type.includes("mpegurl") || type.includes("video/") || type.includes("audio/")) {
+    return contentType;
+  }
+  return fallback;
+}
+
 function pipeInlineStream(res, file, { filename = "questsave-clip" } = {}) {
-  res.setHeader("Content-Type", file.contentType);
+  res.setHeader("Content-Type", playableContentType(file.contentType));
   res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
   res.setHeader("Accept-Ranges", file.acceptRanges || "bytes");
   if (file.contentRange) {
@@ -150,6 +158,7 @@ async function proxyPlayUrl(playUrl, { range, platform } = {}) {
     referer: refererForMediaUrl(playUrl, platform),
     range,
     contentType: "video/mp4",
+    timeout: 4000,
   });
 
   if (!isPlayableContentType(file.contentType)) {
@@ -157,7 +166,20 @@ async function proxyPlayUrl(playUrl, { range, platform } = {}) {
     throw new Error("Stored play URL is not a media stream");
   }
 
+  file.contentType = playableContentType(file.contentType);
   return file;
+}
+
+async function refreshPlayUrl(clip) {
+  if (!clip?._id || !clip.formatId) return;
+  try {
+    const playUrl = await resolvePlayUrl(clip.sourceUrl, clip.formatId);
+    if (playUrl) {
+      await Clip.updateOne({ _id: clip._id }, { playUrl });
+    }
+  } catch {
+    // ignore background refresh failures
+  }
 }
 
 async function streamClipMedia(clip, { range } = {}) {
@@ -165,7 +187,7 @@ async function streamClipMedia(clip, { range } = {}) {
     try {
       return await proxyPlayUrl(clip.playUrl, { range, platform: clip.platform });
     } catch {
-      // fall through to resolve/download pipeline
+      // stale CDN URLs should not block playback
     }
   }
 
@@ -174,7 +196,10 @@ async function streamClipMedia(clip, { range } = {}) {
     throw new AppError("This clip has no playable format saved", 422);
   }
 
-  return fetchMediaFile(clip.sourceUrl, formatId, { range });
+  const file = await fetchMediaFile(clip.sourceUrl, formatId, { range });
+  file.contentType = playableContentType(file.contentType);
+  void refreshPlayUrl(clip);
+  return file;
 }
 
 async function ensureClipAccess(clipId, userId) {
@@ -230,6 +255,31 @@ export const resolveClip = asyncHandler(async (req, res) => {
   res.json(preview);
 });
 
+function pipeAttachment(res, file, { platform, title }) {
+  const ext = (file.filename || "").includes(".")
+    ? file.filename.split(".").pop()
+    : file.contentType?.includes("image")
+      ? "jpg"
+      : file.contentType?.includes("audio")
+        ? "mp3"
+        : "mp4";
+  const filename = buildDownloadFilename({ platform, title, ext });
+
+  res.setHeader("Content-Type", playableContentType(file.contentType, file.contentType || "application/octet-stream"));
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  if (file.size) {
+    res.setHeader("Content-Length", file.size);
+  }
+
+  file.stream.on("close", () => {
+    file.cleanup();
+  });
+  file.stream.on("error", () => {
+    file.cleanup();
+  });
+  file.stream.pipe(res);
+}
+
 export const downloadClip = asyncHandler(async (req, res) => {
   const parsed = urlSchema
     .extend({
@@ -245,31 +295,8 @@ export const downloadClip = asyncHandler(async (req, res) => {
   const { platform, url } = detectPlatform(parsed.data.url);
   const formatId = sanitizeFormatId(parsed.data.formatId);
   const file = await fetchMediaFile(url, formatId);
-
   const title = parsed.data.title?.trim() || getResolved(url)?.title || "";
-  const ext = (file.filename || "").includes(".")
-    ? file.filename.split(".").pop()
-    : file.contentType?.includes("image")
-      ? "jpg"
-      : file.contentType?.includes("audio")
-        ? "mp3"
-        : "mp4";
-
-  const filename = buildDownloadFilename({ platform, title, ext });
-
-  res.setHeader("Content-Type", file.contentType);
-  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-  if (file.size) {
-    res.setHeader("Content-Length", file.size);
-  }
-
-  file.stream.on("close", () => {
-    file.cleanup();
-  });
-  file.stream.on("error", () => {
-    file.cleanup();
-  });
-  file.stream.pipe(res);
+  pipeAttachment(res, file, { platform, title });
 });
 
 export const previewStream = asyncHandler(async (req, res) => {
@@ -298,6 +325,30 @@ export const clipStreamAccess = asyncHandler(async (req, res) => {
   });
 
   res.json({ token });
+});
+
+export const downloadSavedClip = asyncHandler(async (req, res) => {
+  let userId = req.user?._id;
+  const token = req.query.token;
+  if (typeof token === "string" && token) {
+    const payload = verifyStreamToken(token);
+    if (String(payload.clipId) !== String(req.params.id)) {
+      throw new AppError("Invalid download link", 401);
+    }
+    userId = payload.userId;
+  }
+
+  const clip = await ensureClipAccess(req.params.id, userId);
+  const formatId = clip.formatId || "";
+  if (!formatId) {
+    throw new AppError("This clip has no download format saved", 422);
+  }
+
+  const file = await fetchMediaFile(clip.sourceUrl, formatId);
+  pipeAttachment(res, file, {
+    platform: clip.platform,
+    title: clip.title || "",
+  });
 });
 
 export const streamClip = asyncHandler(async (req, res) => {

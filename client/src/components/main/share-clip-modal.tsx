@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import Modal from "@/components/ui/modal";
 import { shareClip } from "@/config/clipApi";
 import { getApiError } from "@/config/api";
+import { useInvalidateClipCaches } from "@/hooks";
 import InputWithoutIcon from "@/components/ui/InputWithoutIcon";
 
 interface ShareClipModalProps {
@@ -21,6 +22,7 @@ export default function ShareClipModal({
 }: ShareClipModalProps) {
   const [username, setUsername] = useState("");
   const [sharing, setSharing] = useState(false);
+  const invalidateClips = useInvalidateClipCaches();
 
   const handleShare = async () => {
     const value = username.trim().replace(/^@/, "");
@@ -32,6 +34,7 @@ export default function ShareClipModal({
     setSharing(true);
     try {
       const share = await shareClip(clipId, value);
+      invalidateClips();
       toast.success(`Shared with @${share.username}`);
       setUsername("");
       onClose();

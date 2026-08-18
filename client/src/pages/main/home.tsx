@@ -8,6 +8,7 @@ import SaveClipModal from "@/components/main/save-clip-modal";
 import { resolveClip, saveClip } from "@/config/clipApi";
 import { getApiError } from "@/config/api";
 import { isSearchQuery } from "@/helpers/isValidHttpUrl";
+import { useInvalidateClipCaches } from "@/hooks";
 import useAuthStore from "@/store/useAuthStore";
 import useDownloadStore from "@/store/useDownloadStore";
 import type { ClipFormat, ClipPreview, ClipVisibility, FeedClip } from "@/types/clip";
@@ -37,6 +38,7 @@ export default function Home() {
   const pendingKindRef = useRef<"save-download" | "save">("save-download");
   const visibilityRef = useRef<ClipVisibility>("private");
   const queueDownload = useDownloadStore((state) => state.queueDownload);
+  const invalidateClips = useInvalidateClipCaches();
 
   const selectedFormat = preview?.formats.find((fmt) => fmt.id === formatId);
   const activeFormatId =
@@ -109,6 +111,7 @@ export default function Home() {
       mediaType: preview.mediaType,
       visibility,
     });
+    invalidateClips();
   };
 
   const runSaveOnly = async (visibility = visibilityRef.current) => {

@@ -32,7 +32,7 @@ export default function DownloadProgressBar({
     <div
         className={clsx(
           variant === "global" && "pointer-events-none fixed inset-x-0 top-0 z-[80]",
-          variant === "watch" && "pointer-events-none absolute inset-x-0 top-0 z-30 pl-14 pr-3",
+          variant === "watch" && "pointer-events-none absolute inset-x-0 top-0 z-30 pl-28 pr-3",
           variant === "embed" && "mt-3"
         )}
     >

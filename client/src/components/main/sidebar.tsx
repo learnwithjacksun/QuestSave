@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { NavLink } from "react-router-dom";
 import clsx from "clsx";
 import {
@@ -6,13 +6,18 @@ import {
   PanelLeftOpenIcon,
   Search01Icon,
   Cancel01Icon,
+  Logout03Icon,
 } from "@hugeicons/core-free-icons";
 import { navItems } from "@/constants/navigation";
-import { fetchSavedClips } from "@/config/clipApi";
+import { logout } from "@/config/clipApi";
+import { getApiError } from "@/config/api";
+import { useLibraryData } from "@/hooks";
+import { queryKeys } from "@/hooks/queryKeys";
 import useSidebarStore from "@/store/useSidebarStore";
 import useAuthStore from "@/store/useAuthStore";
-import type { SavedClip } from "@/types/clip";
 import Icon from "./icon";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface SidebarProps {
   hidden?: boolean;
@@ -20,21 +25,13 @@ interface SidebarProps {
 
 export default function Sidebar({ hidden = false }: SidebarProps) {
   const { isOpen, toggle, setOpen } = useSidebarStore();
-  const { user, openOverlay } = useAuthStore();
+  const { user, openOverlay, setUser, setPendingSave } = useAuthStore();
+  const queryClient = useQueryClient();
+  const libraryQuery = useLibraryData();
   const [query, setQuery] = useState("");
-  const [savedClips, setSavedClips] = useState<SavedClip[]>([]);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const normalizedQuery = query.trim().toLowerCase();
-
-  useEffect(() => {
-    if (!user) {
-      setSavedClips([]);
-      return;
-    }
-    fetchSavedClips()
-      .then(setSavedClips)
-      .catch(() => setSavedClips([]));
-  }, [user]);
 
   const filteredNavItems = useMemo(() => {
     if (!normalizedQuery) return navItems;
@@ -46,12 +43,13 @@ export default function Sidebar({ hidden = false }: SidebarProps) {
   }, [normalizedQuery]);
 
   const filteredRecents = useMemo(() => {
-    if (!normalizedQuery) return savedClips;
-    return savedClips.filter((clip) => {
+    const clips = libraryQuery.data?.clips ?? [];
+    if (!normalizedQuery) return clips;
+    return clips.filter((clip) => {
       const haystack = `${clip.title} ${clip.author} ${clip.platform}`.toLowerCase();
       return haystack.includes(normalizedQuery);
     });
-  }, [normalizedQuery, savedClips]);
+  }, [normalizedQuery, libraryQuery.data?.clips]);
 
   const hasResults =
     filteredNavItems.length > 0 || filteredRecents.length > 0;
@@ -194,6 +192,7 @@ export default function Sidebar({ hidden = false }: SidebarProps) {
         {/* Footer */}
         <div className="p-3 border-t border-line">
           <button
+            type="button"
             onClick={() => {
               if (!user) openOverlay();
             }}
@@ -206,8 +205,37 @@ export default function Sidebar({ hidden = false }: SidebarProps) {
               <p className="text-sm font-medium text-main truncate">
                 {user?.username || "Guest User"}
               </p>
+              <p className="text-xs text-muted truncate">
+                {user ? "Signed in" : "Sign in to save clips"}
+              </p>
             </div>
           </button>
+          {user ? (
+            <button
+              type="button"
+              disabled={loggingOut}
+              onClick={async () => {
+                setLoggingOut(true);
+                try {
+                  await logout();
+                  setUser(null);
+                  setPendingSave(false);
+                  queryClient.removeQueries({ queryKey: queryKeys.me });
+                  queryClient.removeQueries({ queryKey: queryKeys.library });
+                  void queryClient.invalidateQueries({ queryKey: queryKeys.discover });
+                  toast.success("Signed out");
+                } catch (error) {
+                  toast.error(getApiError(error, "Could not sign out"));
+                } finally {
+                  setLoggingOut(false);
+                }
+              }}
+              className="mt-1 flex items-center gap-3 w-full px-2 py-2 rounded-lg text-sm text-white hover:text-red-600 center hover:bg-red-300 bg-red-600 transition-colors disabled:opacity-60"
+            >
+              <Icon icon={Logout03Icon} size={18} />
+              {loggingOut ? "Signing out..." : "Log out"}
+            </button>
+          ) : null}
         </div>
       </aside>
     </>
