@@ -134,7 +134,12 @@ export default function VideoPlayer({
     };
   }, [src, poster, vertical, autoplay, mimeType]);
 
+  const stopPlayerGesture = (event: React.SyntheticEvent) => {
+    event.stopPropagation();
+  };
+
   const toggleMute = (event: React.MouseEvent) => {
+    event.preventDefault();
     event.stopPropagation();
     const player = playerRef.current;
     if (!player) return;
@@ -168,20 +173,21 @@ export default function VideoPlayer({
       className={`relative questsave-player ${vertical ? "questsave-player-vertical" : ""} ${className}`}
       onClick={vertical ? togglePlay : undefined}
     >
-      <div ref={placeholderRef} className="h-full w-full" />
+      <div ref={placeholderRef} className="questsave-player-media h-full w-full" />
       {vertical && (
         <>
           <button
             type="button"
             title={muted ? "Unmute" : "Mute"}
+            onPointerDown={stopPlayerGesture}
             onClick={toggleMute}
-            className="absolute top-3 left-16 z-30 h-10 w-10 rounded-full bg-black/50 border border-white/15 center text-white hover:bg-black/70"
+            className="absolute top-3 left-16 z-50 h-10 w-10 rounded-full bg-black/50 border border-white/15 center text-white hover:bg-black/70 pointer-events-auto"
           >
             {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
           </button>
           <div
             ref={barRef}
-            className="absolute inset-x-0 bottom-0 z-30 h-5 flex items-end cursor-pointer"
+            className="absolute inset-x-0 bottom-0 z-30 h-5 flex items-end cursor-pointer pointer-events-auto"
             onClick={(event) => {
               event.stopPropagation();
               seekTo(event);
