@@ -15,7 +15,7 @@ app.set("trust proxy", 1);
 
 app.use(
   cors({
-    origin: ["https://questsave.orzn.app","http://localhost:3000"],
+    origin: ["https://questsave.orzn.app","http://localhost:3001"],
     credentials: true,
     exposedHeaders: ["Content-Disposition", "Content-Range", "Accept-Ranges", "Content-Length"],
   }),
@@ -47,7 +47,7 @@ connectDb()
       });
       if (check.error?.code === "ENOENT") {
         console.warn(
-          `[warn] yt-dlp not found at "${env.ytdlp.path}". Pinterest resolve will fail until it is installed (TikTok and X keep it as a last-resort fallback).`,
+          `[warn] yt-dlp not found at "${env.ytdlp.path}". It is only used as a last-resort fallback now.`,
         );
       } else if (check.status === 0) {
         console.log(`yt-dlp ${String(check.stdout || check.stderr).trim()}`);
@@ -56,10 +56,8 @@ connectDb()
       // ignore probe failures
     }
 
-    if (!env.rapidApi.key) {
-      console.warn(
-        "[warn] RAPIDAPI_KEY is not set. YouTube, Instagram, and Facebook downloads will fail until it is configured.",
-      );
+    if (!env.streamSaver.baseUrl) {
+      console.warn("[warn] STREAMSAVER_API_BASE is not set. Non-TikTok downloads will fail.");
     }
 
     app.listen(env.port, () => {

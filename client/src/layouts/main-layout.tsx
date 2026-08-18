@@ -1,4 +1,4 @@
-import { Sidebar, SidebarToggle } from "@/components/main";
+import { Sidebar, SidebarToggle, DownloadProgressBar } from "@/components/main";
 import AuthOverlay from "@/components/auth/auth-overlay";
 import ThemeToggle from "@/components/ui/theme-toggle";
 import useSidebarStore from "@/store/useSidebarStore";
@@ -18,6 +18,7 @@ export default function MainLayout() {
   return (
     <div className="flex h-dvh overflow-hidden bg-background">
       <Sidebar hidden={watchMode} />
+      {!watchMode && <DownloadProgressBar variant="global" />}
 
       <main
         className={clsx(

@@ -2,6 +2,8 @@ import {
   siFacebook,
   siInstagram,
   siPinterest,
+  siSoundcloud,
+  siThreads,
   siX,
   siYoutube,
 } from "simple-icons";
@@ -20,6 +22,8 @@ const platforms: FloatingIcon[] = [
   { icon: siX, className: "top-[48%] right-[5%] size-9", delay: "0.8s" },
   { icon: siPinterest, className: "bottom-[16%] left-[14%] size-10", delay: "1.8s" },
   { icon: siFacebook, className: "bottom-[14%] right-[12%] size-10", delay: "2.8s" },
+  { icon: siThreads, className: "top-[8%] left-[18%] size-9", delay: "0.4s" },
+  { icon: siSoundcloud, className: "bottom-[8%] right-[22%] size-9", delay: "2.1s" },
 ];
 
 function BrandIcon({ icon }: { icon: SimpleIcon }) {

@@ -20,10 +20,17 @@ const clipSchema = new mongoose.Schema(
       default: "video",
     },
     playUrl: { type: String, default: "" },
+    visibility: {
+      type: String,
+      enum: ["private", "public"],
+      default: "private",
+      index: true,
+    },
   },
   { timestamps: true }
 );
 
 clipSchema.index({ userId: 1, createdAt: -1 });
+clipSchema.index({ visibility: 1, createdAt: -1 });
 
 export default mongoose.model("Clip", clipSchema);

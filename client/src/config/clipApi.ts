@@ -1,5 +1,18 @@
 import api, { getApiError } from "@/config/api";
-import type { AuthUser, ClipPreview, SavedClip, SharedClip } from "@/types/clip";
+import type {
+  AuthUser,
+  ClipPreview,
+  SavedClip,
+  SharedClip,
+  YoutubeSearchResult,
+} from "@/types/clip";
+
+export async function searchYoutube(query: string) {
+  const { data } = await api.get<YoutubeSearchResult>("/api/clips/search", {
+    params: { q: query },
+  });
+  return data;
+}
 
 function apiOrigin() {
   return String(import.meta.env.VITE_BASE_URL || "").replace(/\/$/, "");
@@ -10,6 +23,11 @@ export async function resolveClip(url: string) {
   return data;
 }
 
+export async function fetchDiscoverClips() {
+  const { data } = await api.get<{ clips: SavedClip[] }>("/api/clips/discover");
+  return data.clips;
+}
+
 export async function saveClip(payload: {
   url: string;
   platform: string;
@@ -18,6 +36,7 @@ export async function saveClip(payload: {
   thumbnail: string;
   formatId?: string;
   mediaType: string;
+  visibility?: "private" | "public";
 }) {
   const { data } = await api.post("/api/clips/save", payload);
   return data;
@@ -27,12 +46,22 @@ export async function deleteClip(id: string) {
   await api.delete(`/api/clips/${id}`);
 }
 
-export async function downloadClipFile(url: string, formatId: string, title?: string) {
+export async function downloadClipFile(
+  url: string,
+  formatId: string,
+  title?: string,
+  onProgress?: (loaded: number, total: number) => void
+) {
   try {
     const { data, headers } = await api.post(
       "/api/clips/download",
       { url, formatId, title },
-      { responseType: "blob" }
+      {
+        responseType: "blob",
+        onDownloadProgress: (event) => {
+          onProgress?.(event.loaded, event.total || 0);
+        },
+      }
     );
 
     const blob = data as Blob;

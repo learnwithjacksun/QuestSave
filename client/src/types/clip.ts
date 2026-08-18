@@ -4,7 +4,46 @@ export type Platform =
   | "twitter"
   | "youtube"
   | "pinterest"
-  | "facebook";
+  | "facebook"
+  | "threads"
+  | "soundcloud"
+  | "douyin"
+  | "xiaohongshu"
+  | "xiaohongshu-profile"
+  | "snackvideo"
+  | "cocofun"
+  | "kuaishou"
+  | "capcut"
+  | "gdrive"
+  | "mediafire"
+  | "spotify"
+  | "yts";
+
+export interface YoutubeSearchAuthor {
+  name: string;
+  url: string;
+}
+
+export interface YoutubeSearchVideo {
+  type: string;
+  videoId: string;
+  url: string;
+  title: string;
+  description: string;
+  thumbnail: string;
+  seconds: number;
+  timestamp: string;
+  ago: string;
+  views: number;
+  author: YoutubeSearchAuthor;
+}
+
+export interface YoutubeSearchResult {
+  platform: "yts";
+  query: string;
+  videos: YoutubeSearchVideo[];
+}
+
 export type MediaType = "video" | "image" | "audio" | "mixed";
 
 export interface ClipFormat {
@@ -46,6 +85,8 @@ export interface AuthUser {
   username: string;
 }
 
+export type ClipVisibility = "private" | "public";
+
 export interface SavedClip {
   id: string;
   platform: string;
@@ -56,6 +97,8 @@ export interface SavedClip {
   formatId?: string;
   mediaType: MediaType | string;
   playUrl?: string;
+  visibility?: ClipVisibility;
+  ownerUsername?: string;
   createdAt: string;
 }
 
@@ -71,7 +114,9 @@ export interface SharedClip {
 
 export type LibraryTab = "saved" | "shared";
 
-export type FeedOrigin = "library" | "shared" | "preview" | "public";
+export type FypTab = "discover" | "library";
+
+export type FeedOrigin = "library" | "shared" | "preview" | "public" | "youtube";
 
 export interface FeedClip extends SavedClip {
   origin: FeedOrigin;
@@ -79,5 +124,6 @@ export interface FeedClip extends SavedClip {
 }
 
 export interface PreviewWatchState {
-  preview: FeedClip;
+  preview?: FeedClip;
+  playlist?: FeedClip[];
 }

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link01Icon, ClipboardCopyIcon, ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { toast } from "sonner";
 import clsx from "clsx";
-import { isValidHttpUrl } from "@/helpers/isValidHttpUrl";
+import { isResolvableInput, isValidHttpUrl } from "@/helpers/isValidHttpUrl";
 import Icon from "./icon";
 
 interface LinkInputProps {
@@ -15,7 +15,7 @@ interface LinkInputProps {
 
 export default function LinkInput({
   onSubmit,
-  placeholder = "Paste media link...",
+  placeholder = "Paste a link...",
   className,
   loading = false,
   resetNonce = 0,
@@ -71,8 +71,8 @@ export default function LinkInput({
       inputRef.current?.focus();
       return;
     }
-    if (!isValidHttpUrl(trimmed)) {
-      toast.error("Enter a valid http or https link");
+    if (!isResolvableInput(trimmed)) {
+      toast.error("Enter a valid http or https link, or a YouTube search");
       return;
     }
     lastSubmitted.current = trimmed;

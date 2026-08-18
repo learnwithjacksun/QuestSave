@@ -2,13 +2,15 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader } from "lucide-react";
 import { toast } from "sonner";
-import { FloatingPlatforms, LinkInput, QuickActions } from "@/components/main";
+import { LinkInput, SupportedPlatforms } from "@/components/main";
 import ClipPreviewCard, { type SelectedSlideInfo } from "@/components/main/clip-preview";
 import SaveClipModal from "@/components/main/save-clip-modal";
-import { downloadClipFile, resolveClip, saveClip } from "@/config/clipApi";
+import { resolveClip, saveClip } from "@/config/clipApi";
 import { getApiError } from "@/config/api";
+import { isSearchQuery } from "@/helpers/isValidHttpUrl";
 import useAuthStore from "@/store/useAuthStore";
-import type { ClipFormat, ClipPreview, FeedClip } from "@/types/clip";
+import useDownloadStore from "@/store/useDownloadStore";
+import type { ClipFormat, ClipPreview, ClipVisibility, FeedClip } from "@/types/clip";
 
 type ModalAction = "save-download" | "save" | "download" | null;
 
@@ -33,6 +35,8 @@ export default function Home() {
   const [inputReset, setInputReset] = useState(0);
   const savingRef = useRef(false);
   const pendingKindRef = useRef<"save-download" | "save">("save-download");
+  const visibilityRef = useRef<ClipVisibility>("private");
+  const queueDownload = useDownloadStore((state) => state.queueDownload);
 
   const selectedFormat = preview?.formats.find((fmt) => fmt.id === formatId);
   const activeFormatId =
@@ -52,6 +56,10 @@ export default function Home() {
   };
 
   const handleResolve = async (url: string) => {
+    if (isSearchQuery(url)) {
+      navigate(`/youtube-search?q=${encodeURIComponent(url.trim())}`);
+      return;
+    }
     setLoading(true);
     setError("");
     setPreview(null);
@@ -73,8 +81,13 @@ export default function Home() {
     if (!preview || !activeFormatId) return;
     setModalAction("download");
     try {
-      await downloadClipFile(preview.sourceUrl, activeFormatId, preview.title);
-      toast.success("Download started");
+      await queueDownload({
+        key: preview.sourceUrl,
+        url: preview.sourceUrl,
+        formatId: activeFormatId,
+        title: preview.title,
+      });
+      toast.success("Saved to your device");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : getApiError(err, "Download failed"));
     } finally {
@@ -83,7 +96,7 @@ export default function Home() {
     }
   };
 
-  const persistClip = async () => {
+  const persistClip = async (visibility: ClipVisibility) => {
     if (!preview || !activeFormatId) return;
     const thumbnail = slideInfo?.thumbnail || preview.thumbnail;
     await saveClip({
@@ -94,15 +107,16 @@ export default function Home() {
       thumbnail,
       formatId: activeFormatId,
       mediaType: preview.mediaType,
+      visibility,
     });
   };
 
-  const runSaveOnly = async () => {
+  const runSaveOnly = async (visibility = visibilityRef.current) => {
     if (!preview || !activeFormatId) return;
     setModalAction("save");
     try {
-      await persistClip();
-      toast.success("Saved to your library");
+      await persistClip(visibility);
+      toast.success(visibility === "public" ? "Saved to Discover" : "Saved to your library");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : getApiError(err, "Could not save clip"));
     } finally {
@@ -112,14 +126,19 @@ export default function Home() {
     }
   };
 
-  const runSaveAndDownload = async () => {
+  const runSaveAndDownload = async (visibility = visibilityRef.current) => {
     if (!preview || !activeFormatId) return;
     setModalAction("save-download");
     try {
-      await downloadClipFile(preview.sourceUrl, activeFormatId, preview.title);
+      await queueDownload({
+        key: preview.sourceUrl,
+        url: preview.sourceUrl,
+        formatId: activeFormatId,
+        title: preview.title,
+      });
       try {
-        await persistClip();
-        toast.success("Saved to your library");
+        await persistClip(visibility);
+        toast.success(visibility === "public" ? "Saved to Discover" : "Saved to your library");
       } catch (err) {
         toast.error(
           err instanceof Error
@@ -147,12 +166,14 @@ export default function Home() {
     action();
   };
 
-  const handleSaveAndDownload = () => {
-    requireAuthThen("save-download", () => void runSaveAndDownload());
+  const handleSaveAndDownload = (visibility: ClipVisibility) => {
+    visibilityRef.current = visibility;
+    requireAuthThen("save-download", () => void runSaveAndDownload(visibility));
   };
 
-  const handleSaveOnly = () => {
-    requireAuthThen("save", () => void runSaveOnly());
+  const handleSaveOnly = (visibility: ClipVisibility) => {
+    visibilityRef.current = visibility;
+    requireAuthThen("save", () => void runSaveOnly(visibility));
   };
 
   const handleWatch = () => {
@@ -186,13 +207,13 @@ export default function Home() {
 
   return (
     <div className="relative flex flex-col items-center justify-center min-h-full px-4 pb-16">
-      <FloatingPlatforms />
+      {/* <FloatingPlatforms /> */}
 
       <div className="relative z-10 w-full max-w-3xl mx-auto text-center">
         <h1 className="text-3xl md:text-4xl text-main mb-10 tracking-tight">
           Download media{" "}
           <span className="font-dancing tracking-wide">effortlessly</span> from
-          social media platforms
+          any platform
         </h1>
 
         <LinkInput onSubmit={handleResolve} loading={loading} resetNonce={inputReset} />
@@ -227,11 +248,14 @@ export default function Home() {
           </>
         )}
 
-        <QuickActions />
+        {/* <QuickActions /> */}
 
-        <p className="mt-8 text-sm text-muted max-w-md mx-auto">
-          Paste a link from TikTok, Instagram, Twitter/X, YouTube, Facebook platforms to save videos and images.
-        </p>
+        {!preview && (
+          <div className="mt-8">
+            <p className="text-sm text-muted mb-2">Supported platforms:</p>
+            <SupportedPlatforms />
+          </div>
+        )}
       </div>
 
       <SaveClipModal

@@ -17,7 +17,6 @@ import { Icon, ShareClipModal } from "@/components/main";
 import Modal from "@/components/ui/modal";
 import {
   deleteClip,
-  downloadClipFile,
   fetchReceivedShares,
   fetchSavedClips,
   removeShare,
@@ -27,26 +26,9 @@ import { getApiError } from "@/config/api";
 import { proxiedImageUrl } from "@/helpers/proxiedImageUrl";
 import { fypWatchPath } from "@/helpers/watchPath";
 import useAuthStore from "@/store/useAuthStore";
+import useDownloadStore from "@/store/useDownloadStore";
 import type { LibraryTab, SavedClip, SharedClip } from "@/types/clip";
-
-const platformLabels: Record<string, string> = {
-  tiktok: "TikTok",
-  instagram: "Instagram",
-  twitter: "X",
-  youtube: "YouTube",
-  pinterest: "Pinterest",
-  facebook: "Facebook",
-};
-
-const PLATFORM_FILTERS = [
-  { value: "all", label: "All platforms" },
-  { value: "tiktok", label: "TikTok" },
-  { value: "instagram", label: "Instagram" },
-  { value: "twitter", label: "X" },
-  { value: "youtube", label: "YouTube" },
-  { value: "facebook", label: "Facebook" },
-  { value: "pinterest", label: "Pinterest" },
-];
+import { PLATFORM_FILTERS, PLATFORM_LABELS } from "@/constants/platforms";
 
 const DATE_FILTERS = [
   { value: "all", label: "Any time" },
@@ -101,6 +83,7 @@ export default function Library() {
   const [sharedClips, setSharedClips] = useState<SharedClip[]>([]);
   const [loading, setLoading] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const queueDownload = useDownloadStore((state) => state.queueDownload);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [removingShareId, setRemovingShareId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SavedClip | null>(null);
@@ -208,8 +191,13 @@ export default function Library() {
       if (!formatId) {
         throw new Error("No download format available");
       }
-      await downloadClipFile(clip.sourceUrl, formatId, clip.title);
-      toast.success("Download started");
+      await queueDownload({
+        key: clip.id,
+        url: clip.sourceUrl,
+        formatId,
+        title: clip.title,
+      });
+      toast.success("Saved to your device");
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : getApiError(err, "Download failed")
@@ -309,7 +297,7 @@ export default function Library() {
       <div className="px-3 py-2.5 sm:p-3 lg:px-4 lg:py-3 flex flex-col gap-2 min-w-0 flex-1">
         <div className="min-w-0">
           <p className="text-xs uppercase tracking-wide text-primary font-medium">
-            {platformLabels[clip.platform] || clip.platform}
+            {PLATFORM_LABELS[clip.platform] || clip.platform}
           </p>
           <h2 className="text-[15px] font-medium text-main truncate mt-0.5">
             {clip.title || "Untitled"}
@@ -484,17 +472,15 @@ export default function Library() {
         </p>
       </div>
 
-      <div className="mb-6 flex gap-2">
+      <div className="flex gap-1 mb-6 p-1 rounded-xl bg-hover w-fit">
         {LIBRARY_TABS.map((tab) => (
           <button
             key={tab.value}
             type="button"
             onClick={() => setActiveTab(tab.value)}
             className={clsx(
-              "h-10 px-4 rounded-xl text-sm font-medium transition-colors",
-              activeTab === tab.value
-                ? "bg-primary text-white"
-                : "border border-line text-main hover:bg-hover"
+              "h-9 px-4 rounded-lg text-sm",
+              activeTab === tab.value ? "bg-background text-main shadow-sm" : "text-muted"
             )}
           >
             {tab.label}

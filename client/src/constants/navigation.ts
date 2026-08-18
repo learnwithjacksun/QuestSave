@@ -2,7 +2,9 @@ import {
   Bookmark02Icon,
   ClapperboardIcon,
   PlayCircleIcon,
-  UserSearch01Icon,
+  Search01Icon,
+  AiImageIcon,
+  ImageAdd01Icon,
 } from "@hugeicons/core-free-icons";
 import type { IconSvgElement } from "@hugeicons/react";
 
@@ -15,10 +17,22 @@ export interface NavItem {
 
 export const navItems: NavItem[] = [
   {
-    label: "Save Clip",
+    label: "Save Media",
     path: "/",
     icon: ClapperboardIcon,
-    description: "Save videos & images from social media links",
+    description: "Save videos, images, and audio from supported media links",
+  },
+  {
+    label: "YouTube Search",
+    path: "/youtube-search",
+    icon: Search01Icon,
+    description: "Search YouTube, preview a result, then save or download it",
+  },
+  {
+    label: "FYP",
+    path: "/fyp",
+    icon: PlayCircleIcon,
+    description: "Watch your library and public clips in a TikTok-style feed",
   },
   {
     label: "Library",
@@ -27,15 +41,15 @@ export const navItems: NavItem[] = [
     description: "Your saved clips and downloads",
   },
   {
-    label: "FYP",
-    path: "/fyp",
-    icon: PlayCircleIcon,
-    description: "Watch your library in a TikTok-style feed",
+    label: "Image Search",
+    path: "/image-search",
+    icon: ImageAdd01Icon,
+    description: "Search and find images precised images online",
   },
   {
-    label: "Avatar Search",
-    path: "/avatar-search",
-    icon: UserSearch01Icon,
-    description: "Search and find avatars across platforms",
+    label: "Generate AI Image",
+    path: "/generate-ai-image",
+    icon: AiImageIcon,
+    description: "Generate AI images using DALL-E 3",
   },
 ];

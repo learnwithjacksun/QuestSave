@@ -12,7 +12,30 @@ export function refererForPlatform(platform) {
   if (platform === "tiktok") return "https://www.tiktok.com/";
   if (platform === "twitter") return "https://x.com/";
   if (platform === "pinterest") return "https://www.pinterest.com/";
+  if (platform === "threads") return "https://www.threads.net/";
+  if (platform === "soundcloud") return "https://soundcloud.com/";
+  if (platform === "douyin") return "https://www.douyin.com/";
+  if (platform === "xiaohongshu" || platform === "xiaohongshu-profile") return "https://www.xiaohongshu.com/";
+  if (platform === "snackvideo") return "https://www.snackvideo.com/";
+  if (platform === "cocofun") return "https://www.icocofun.com/";
+  if (platform === "kuaishou") return "https://www.kuaishou.com/";
+  if (platform === "capcut") return "https://www.capcut.com/";
+  if (platform === "gdrive") return "https://drive.google.com/";
+  if (platform === "mediafire") return "https://www.mediafire.com/";
+  if (platform === "spotify") return "https://open.spotify.com/";
   return "https://www.youtube.com/";
+}
+
+export function refererForMediaUrl(mediaUrl, platform) {
+  try {
+    const host = new URL(mediaUrl).hostname.toLowerCase();
+    if (host.includes("rapidcdn.app") || host.includes("ymcdn.org") || host.includes("orzn.app")) {
+      return "https://streamsaver.orzn.app/";
+    }
+  } catch {
+    // ignore invalid URLs
+  }
+  return refererForPlatform(platform);
 }
 
 export function originForReferer(referer) {

@@ -3,7 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import Icon from "./icon";
 import FeedSlide from "./feed-slide";
+import DownloadProgressBar from "./download-progress-bar";
 import type { FeedClip } from "@/types/clip";
+import useDownloadStore from "@/store/useDownloadStore";
 
 interface SnapFeedProps {
   items: FeedClip[];
@@ -23,6 +25,14 @@ export default function SnapFeed({
   const navigate = useNavigate();
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const [activeId, setActiveId] = useState(startId || items[0]?.id || "");
+  const jobs = useDownloadStore((state) => state.jobs);
+  const activeClip = items.find((item) => item.id === activeId);
+  const showTopProgress = jobs.some(
+    (job) =>
+      job.status === "downloading" &&
+      job.key !== activeId &&
+      job.key !== activeClip?.sourceUrl
+  );
 
   useEffect(() => {
     if (!startId) return;
@@ -85,11 +95,12 @@ export default function SnapFeed({
 
   return (
     <div className="relative h-full w-full bg-black">
+      {showTopProgress && <DownloadProgressBar variant="watch" />}
       <button
         type="button"
         onClick={() => navigate(backTo)}
         title="Back"
-        className="absolute top-3 left-3 z-20 h-10 w-10 rounded-full bg-black/50 border border-white/15 center text-white hover:bg-black/70"
+        className="absolute top-3 left-3 z-40 h-10 w-10 rounded-full bg-black/50 border border-white/15 center text-white hover:bg-black/70"
       >
         <Icon icon={ArrowLeft01Icon} size={20} />
       </button>

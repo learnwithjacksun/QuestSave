@@ -10,9 +10,17 @@ import {
   isRapidApiPlatform,
   resolveSocialMedia,
 } from "../services/rapidApi/socialMediaDownloader.js";
+import {
+  downloadStreamSaver,
+  isStreamSaverFormat,
+  isStreamSaverPlatform,
+  resolveStreamSaver,
+  searchYouTube,
+} from "../services/streamSaver.js";
 import { downloadMedia, resolveMedia } from "../services/ytdlp.js";
 import { resolvePlayUrl } from "../services/playUrl.js";
-import { proxyCdnUrl, refererForPlatform, requestRange } from "../services/cdnProxy.js";
+import { proxyCdnUrl, refererForMediaUrl, requestRange } from "../services/cdnProxy.js";
+import env from "../config/env.js";
 import { AppError } from "../utils/AppError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { buildDownloadFilename } from "../utils/downloadFilename.js";
@@ -22,7 +30,52 @@ const urlSchema = z.object({
   url: z.string().trim().min(1, "Paste a link first"),
 });
 
+const LEGACY_FALLBACK_PLATFORMS = new Set([
+  "twitter",
+  "youtube",
+  "instagram",
+  "facebook",
+  "pinterest",
+  "threads",
+  "soundcloud",
+]);
+
+async function resolvePreview(platform, url) {
+  if (platform === "tiktok") {
+    return resolveTikTok(url);
+  }
+
+  if (isStreamSaverPlatform(platform)) {
+    try {
+      return await resolveStreamSaver(url, platform);
+    } catch (err) {
+      if (process.env.NODE_ENV !== "production") {
+        console.error("[streamsaver]", err.message);
+      }
+      if (!LEGACY_FALLBACK_PLATFORMS.has(platform)) throw err;
+      try {
+        if (platform === "twitter") return await resolveTwitter(url);
+        if (isRapidApiPlatform(platform) && env.rapidApi.key) {
+          return await resolveSocialMedia(url, platform);
+        }
+        return await resolveMedia(url, platform);
+      } catch (fallbackErr) {
+        if (process.env.NODE_ENV !== "production") {
+          console.error("[streamsaver fallback]", fallbackErr.message);
+        }
+        throw err;
+      }
+    }
+  }
+
+  return resolveMedia(url, platform);
+}
+
 function serializeClip(clip) {
+  const owner = clip.userId;
+  const ownerUsername =
+    owner && typeof owner === "object" && owner.username ? owner.username : undefined;
+
   return {
     id: clip._id,
     platform: clip.platform,
@@ -33,6 +86,8 @@ function serializeClip(clip) {
     formatId: clip.formatId || "",
     mediaType: clip.mediaType,
     playUrl: clip.playUrl || "",
+    visibility: clip.visibility === "public" ? "public" : "private",
+    ownerUsername,
     createdAt: clip.createdAt,
   };
 }
@@ -44,6 +99,9 @@ async function fetchMediaFile(sourceUrl, formatId, { range } = {}) {
 
   if (isTikTokFormat(id)) {
     return downloadTikTok(url, id, options);
+  }
+  if (isStreamSaverFormat(id)) {
+    return downloadStreamSaver(url, id, platform, options);
   }
   if (isTwitterFormat(id)) {
     return downloadTwitter(url, id, options);
@@ -89,7 +147,7 @@ function isPlayableContentType(contentType) {
 
 async function proxyPlayUrl(playUrl, { range, platform } = {}) {
   const file = await proxyCdnUrl(playUrl, {
-    referer: refererForPlatform(platform),
+    referer: refererForMediaUrl(playUrl, platform),
     range,
     contentType: "video/mp4",
   });
@@ -125,6 +183,14 @@ async function ensureClipAccess(clipId, userId) {
     throw new AppError("Clip not found", 404);
   }
 
+  if (clip.visibility === "public") {
+    return clip;
+  }
+
+  if (!userId) {
+    throw new AppError("Sign in to continue", 401);
+  }
+
   if (String(clip.userId) === String(userId)) {
     return clip;
   }
@@ -136,6 +202,15 @@ async function ensureClipAccess(clipId, userId) {
 
   return clip;
 }
+
+export const searchYoutube = asyncHandler(async (req, res) => {
+  const q = String(req.query.q || req.query.query || req.query.url || "").trim();
+  if (!q) {
+    throw new AppError("Search query is required", 400);
+  }
+  const result = await searchYouTube(q);
+  res.json(result);
+});
 
 export const resolveClip = asyncHandler(async (req, res) => {
   const parsed = urlSchema.safeParse(req.body);
@@ -150,14 +225,7 @@ export const resolveClip = asyncHandler(async (req, res) => {
     return;
   }
 
-  const preview =
-    platform === "tiktok"
-      ? await resolveTikTok(url)
-      : platform === "twitter"
-        ? await resolveTwitter(url)
-        : isRapidApiPlatform(platform)
-          ? await resolveSocialMedia(url, platform)
-          : await resolveMedia(url, platform);
+  const preview = await resolvePreview(platform, url);
   setResolved(url, preview);
   res.json(preview);
 });
@@ -223,10 +291,10 @@ export const previewStream = asyncHandler(async (req, res) => {
 });
 
 export const clipStreamAccess = asyncHandler(async (req, res) => {
-  const clip = await ensureClipAccess(req.params.id, req.user._id);
+  const clip = await ensureClipAccess(req.params.id, req.user?._id);
   const token = signStreamToken({
     clipId: clip._id,
-    userId: req.user._id,
+    userId: req.user?._id || clip.userId,
   });
 
   res.json({ token });
@@ -248,6 +316,18 @@ export const streamClip = asyncHandler(async (req, res) => {
   pipeInlineStream(res, file, { filename: clip.title || "questsave-clip" });
 });
 
+export const listDiscover = asyncHandler(async (req, res) => {
+  const clips = await Clip.find({ visibility: "public" })
+    .sort({ createdAt: -1 })
+    .limit(80)
+    .populate("userId", "username")
+    .lean();
+
+  res.json({
+    clips: clips.map((clip) => serializeClip(clip)),
+  });
+});
+
 export const saveClip = asyncHandler(async (req, res) => {
   const parsed = z
     .object({
@@ -258,6 +338,7 @@ export const saveClip = asyncHandler(async (req, res) => {
       thumbnail: z.string().optional(),
       formatId: z.string().optional(),
       mediaType: z.enum(["video", "image", "audio", "mixed"]).optional(),
+      visibility: z.enum(["private", "public"]).optional(),
     })
     .safeParse(req.body);
 
@@ -287,6 +368,7 @@ export const saveClip = asyncHandler(async (req, res) => {
     formatId,
     mediaType: parsed.data.mediaType || "video",
     playUrl,
+    visibility: parsed.data.visibility === "public" ? "public" : "private",
   });
 
   res.status(201).json({ clip: serializeClip(clip) });

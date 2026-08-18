@@ -24,6 +24,30 @@ const HOST_ALLOW = [
   /(^|\.)googleusercontent\.com$/i,
   /(^|\.)tikwm\.com$/i,
   /(^|\.)youtube\.com$/i,
+  /(^|\.)rapidcdn\.app$/i,
+  /(^|\.)ymcdn\.org$/i,
+  /(^|\.)threads\.net$/i,
+  /(^|\.)threads\.com$/i,
+  /(^|\.)sndcdn\.com$/i,
+  /(^|\.)soundcloud\.com$/i,
+  /(^|\.)douyin\.com$/i,
+  /(^|\.)iesdouyin\.com$/i,
+  /(^|\.)xiaohongshu\.com$/i,
+  /(^|\.)xhscdn\.com$/i,
+  /(^|\.)xhslink\.com$/i,
+  /(^|\.)rednote\.com$/i,
+  /(^|\.)snackvideo\.com$/i,
+  /(^|\.)icocofun\.com$/i,
+  /(^|\.)cocofun\.com$/i,
+  /(^|\.)kuaishou\.com$/i,
+  /(^|\.)gifshow\.com$/i,
+  /(^|\.)kwimgs\.com$/i,
+  /(^|\.)capcut\.com$/i,
+  /(^|\.)capcutcdn\.com$/i,
+  /(^|\.)mediafire\.com$/i,
+  /(^|\.)spotify\.com$/i,
+  /(^|\.)scdn\.co$/i,
+  /(^|\.)spotifycdn\.com$/i,
 ];
 
 function hostAllowed(hostname) {
@@ -46,6 +70,21 @@ function refererForHost(hostname) {
     return "https://www.youtube.com/";
   }
   if (host.includes("tikwm")) return "https://www.tikwm.com/";
+  if (host.includes("threads")) return "https://www.threads.net/";
+  if (host.includes("sndcdn") || host.includes("soundcloud")) return "https://soundcloud.com/";
+  if (host.includes("douyin") || host.includes("iesdouyin")) return "https://www.douyin.com/";
+  if (host.includes("xiaohongshu") || host.includes("xhscdn") || host.includes("xhslink") || host.includes("rednote")) {
+    return "https://www.xiaohongshu.com/";
+  }
+  if (host.includes("snackvideo")) return "https://www.snackvideo.com/";
+  if (host.includes("cocofun")) return "https://www.icocofun.com/";
+  if (host.includes("kuaishou") || host.includes("gifshow") || host.includes("kwimgs")) {
+    return "https://www.kuaishou.com/";
+  }
+  if (host.includes("capcut")) return "https://www.capcut.com/";
+  if (host.includes("mediafire")) return "https://www.mediafire.com/";
+  if (host.includes("spotify") || host.includes("scdn")) return "https://open.spotify.com/";
+  if (host.includes("rapidcdn") || host.includes("ymcdn")) return "https://streamsaver.orzn.app/";
   return "https://www.google.com/";
 }
 

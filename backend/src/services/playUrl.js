@@ -5,6 +5,7 @@ import {
   isRapidApiPlatform,
   resolveSocialMediaPlayUrl,
 } from "./rapidApi/socialMediaDownloader.js";
+import { isStreamSaverFormat, resolveStreamSaverPlayUrl } from "./streamSaver.js";
 import { resolveYtdlpPlayUrl } from "./ytdlp.js";
 
 export async function resolvePlayUrl(sourceUrl, formatId) {
@@ -14,6 +15,9 @@ export async function resolvePlayUrl(sourceUrl, formatId) {
 
   if (isTikTokFormat(id)) {
     return resolveTikTokPlayUrl(url, id);
+  }
+  if (isStreamSaverFormat(id)) {
+    return resolveStreamSaverPlayUrl(url, id, platform);
   }
   if (isTwitterFormat(id)) {
     return resolveTwitterPlayUrl(url, id);

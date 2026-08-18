@@ -10,17 +10,10 @@ import {
 import { SelectWithoutIcon } from "@/components/ui";
 import { formatCount } from "@/helpers/formatCount";
 import { proxiedImageUrl } from "@/helpers/proxiedImageUrl";
+import { PLATFORM_LABELS } from "@/constants/platforms";
 import type { ClipFormat, ClipPreview, ClipSlide } from "@/types/clip";
 import Icon from "./icon";
-
-const platformLabels: Record<ClipPreview["platform"], string> = {
-  tiktok: "TikTok",
-  instagram: "Instagram",
-  twitter: "X",
-  youtube: "YouTube",
-  pinterest: "Pinterest",
-  facebook: "Facebook",
-};
+import useDownloadStore from "@/store/useDownloadStore";
 
 export interface SelectedSlideInfo {
   index: number;
@@ -62,6 +55,11 @@ export default function ClipPreviewCard({
   onDownload,
   onWatch,
 }: ClipPreviewCardProps) {
+  const downloading = useDownloadStore((state) =>
+    state.jobs.some(
+      (job) => job.key === preview.sourceUrl && job.status === "downloading"
+    )
+  );
   const [slide, setSlide] = useState(0);
   const [imageStatus, setImageStatus] = useState<"loading" | "loaded" | "error">(
     "loading"
@@ -203,7 +201,7 @@ export default function ClipPreviewCard({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs uppercase tracking-wide text-primary font-medium">
-              {platformLabels[preview.platform]}
+              {PLATFORM_LABELS[preview.platform] || preview.platform}
             </p>
             <h2 className="text-lg font-medium text-main truncate">
               {preview.title || "Untitled"}
@@ -250,10 +248,11 @@ export default function ClipPreviewCard({
           <button
             type="button"
             onClick={onDownload}
-            disabled={!activeDownloadId}
+            disabled={!activeDownloadId || downloading}
             className="btn btn-primary min-h-11 flex-1 rounded-xl gap-2"
           >
-            {downloadLabel}
+            {downloading ? <Loader className="animate-spin" size={18} /> : null}
+            {downloading ? "Downloading..." : downloadLabel}
           </button>
         </div>
       </div>

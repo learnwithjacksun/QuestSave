@@ -61,10 +61,14 @@ export default function VideoPlayer({
       playbackRates: vertical ? [] : [0.5, 0.75, 1, 1.25, 1.5, 2],
       inactivityTimeout: 2500,
       controlBar: {
-        pictureInPictureToggle: !vertical,
-        remainingTimeDisplay: true,
+        pictureInPictureToggle: false,
+        remainingTimeDisplay: !vertical,
+        currentTimeDisplay: false,
+        timeDivider: false,
+        durationDisplay: false,
         playbackRateMenuButton: !vertical,
-        volumePanel: vertical ? { inline: false } : { inline: true },
+        fullscreenToggle: !vertical,
+        volumePanel: { inline: false },
       },
       sources: [{ src, type: sourceType(src, mimeType) }],
     });

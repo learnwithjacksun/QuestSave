@@ -27,6 +27,10 @@ const env = {
     /** curl_cffi target such as chrome; leave empty to skip impersonation. */
     impersonate: process.env.YTDLP_IMPERSONATE || "",
   },
+  streamSaver: {
+    baseUrl: (process.env.STREAMSAVER_API_BASE || "https://streamsaver-api.orzn.app").replace(/\/$/, ""),
+    timeoutMs: Number(process.env.STREAMSAVER_TIMEOUT_MS) || 90_000,
+  },
   rapidApi: {
     key: process.env.RAPIDAPI_KEY || "",
     timeoutMs: Number(process.env.RAPIDAPI_TIMEOUT_MS) || 90_000,

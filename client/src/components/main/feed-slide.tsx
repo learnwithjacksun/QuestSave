@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader } from "lucide-react";
 import {
   Download01Icon,
@@ -7,19 +7,12 @@ import {
 } from "@hugeicons/core-free-icons";
 import Icon from "./icon";
 import VideoPlayer from "./video-player";
-import { getClipPlayback, getPreviewPlayback } from "@/config/clipApi";
+import { getClipPlayback, getPreviewPlayback, resolveClip } from "@/config/clipApi";
 import { getApiError } from "@/config/api";
 import { proxiedImageUrl } from "@/helpers/proxiedImageUrl";
+import useDownloadStore from "@/store/useDownloadStore";
 import type { FeedClip } from "@/types/clip";
-
-const platformLabels: Record<string, string> = {
-  tiktok: "TikTok",
-  instagram: "Instagram",
-  twitter: "X",
-  youtube: "YouTube",
-  pinterest: "Pinterest",
-  facebook: "Facebook",
-};
+import { PLATFORM_LABELS } from "@/constants/platforms";
 
 interface FeedSlideProps {
   clip: FeedClip;
@@ -38,8 +31,17 @@ export default function FeedSlide({
   const [mimeType, setMimeType] = useState("video/mp4");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const formatCache = useRef<Record<string, string>>({});
   const isImage = clip.mediaType === "image";
   const poster = clip.thumbnail ? proxiedImageUrl(clip.thumbnail) : undefined;
+  const downloadJob = useDownloadStore((state) =>
+    state.jobs.find(
+      (job) =>
+        (job.key === clip.id || job.key === clip.sourceUrl) &&
+        (job.status === "downloading" || job.status === "complete")
+    )
+  );
+  const downloading = downloadJob?.status === "downloading";
 
   useEffect(() => {
     if (!active || isImage) return;
@@ -50,10 +52,22 @@ export default function FeedSlide({
     setError("");
     setSrc("");
 
-    const load =
-      clip.origin === "preview" && clip.formatId
-        ? getPreviewPlayback(clip.sourceUrl, clip.formatId)
-        : getClipPlayback(clip.id);
+    const usesUrlStream = clip.origin === "preview" || clip.origin === "youtube";
+
+    const load = usesUrlStream
+      ? (async () => {
+          let formatId = clip.formatId || formatCache.current[clip.id] || "";
+          if (!formatId) {
+            const preview = await resolveClip(clip.sourceUrl);
+            formatId = preview.formats[0]?.id || "";
+            if (formatId) formatCache.current[clip.id] = formatId;
+          }
+          if (!formatId) {
+            throw new Error("Could not load video");
+          }
+          return getPreviewPlayback(clip.sourceUrl, formatId);
+        })()
+      : getClipPlayback(clip.id);
 
     load
       .then((playback) => {
@@ -124,14 +138,18 @@ export default function FeedSlide({
 
       <div className="pointer-events-none absolute bottom-20 left-4 right-20 z-10 text-white">
         <p className="text-[11px] uppercase tracking-wide text-primary font-medium">
-          {platformLabels[clip.platform] || clip.platform}
+          {PLATFORM_LABELS[clip.platform] || clip.platform}
           {clip.origin === "shared" && clip.sharedBy
             ? ` · from @${clip.sharedBy}`
             : clip.origin === "library"
               ? " · Library"
-              : clip.origin === "preview"
-                ? " · Preview"
-                : ""}
+              : clip.origin === "youtube"
+                ? " · YouTube"
+                : clip.origin === "public"
+                  ? " · Discover"
+                  : clip.origin === "preview"
+                    ? " · Preview"
+                    : ""}
         </p>
         <h2 className="text-base font-medium truncate mt-1">
           {clip.title || "Untitled"}
@@ -145,11 +163,16 @@ export default function FeedSlide({
         {onDownload && (
           <button
             type="button"
-            title="Download"
+            title={downloading ? "Downloading" : "Download"}
+            disabled={downloading}
             onClick={() => onDownload(clip)}
-            className="pointer-events-auto h-11 w-11 rounded-full bg-black/45 border border-white/15 center text-white hover:bg-black/70"
+            className="pointer-events-auto h-11 w-11 rounded-full bg-black/45 border border-white/15 center text-white hover:bg-black/70 disabled:opacity-70"
           >
-            <Icon icon={Download01Icon} size={20} />
+            {downloading ? (
+              <Loader className="animate-spin" size={18} />
+            ) : (
+              <Icon icon={Download01Icon} size={20} />
+            )}
           </button>
         )}
         {onShare && clip.origin === "library" && (
