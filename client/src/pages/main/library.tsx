@@ -26,7 +26,7 @@ import { fypWatchPath } from "@/helpers/watchPath";
 import { useInvalidateClipCaches, useLibraryData } from "@/hooks";
 import useAuthStore from "@/store/useAuthStore";
 import useDownloadStore from "@/store/useDownloadStore";
-import type { LibraryTab, SavedClip, SharedClip } from "@/types/clip";
+import type { LibraryTab, SavedClip } from "@/types/clip";
 import { PLATFORM_FILTERS, PLATFORM_LABELS } from "@/constants/platforms";
 
 const DATE_FILTERS = [
